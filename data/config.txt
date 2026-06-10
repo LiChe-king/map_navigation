@@ -1,0 +1,4 @@
+scale = 0.35
+school = 广西大学
+map_image = campus_map.jpg
+
