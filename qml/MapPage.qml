@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import Qt5Compat.GraphicalEffects
 
 Item {
     id: root
@@ -55,6 +56,7 @@ Item {
                     color: modelData.id === root.focusSpotId ? "#ffcf33" : "#de4d3f"
                     border.color: "white"
                     border.width: 3
+                    opacity: 0.95
 
                     MouseArea {
                         anchors.fill: parent
@@ -62,7 +64,7 @@ Item {
                         onClicked: root.popupSpot = modelData
                     }
 
-                    ToolTip.visible: markerMouse.containsMouse
+                    ToolTip.visible: markerMouse.containsMouse ? true : false
                     ToolTip.text: modelData.name + "\n" + modelData.type
 
                     MouseArea {
@@ -84,38 +86,66 @@ Item {
         }
     }
 
+    // 景点信息浮窗（跟随点击）
     Popup {
         id: infoPopup
-        x: 24
+        x: parent.width - 360
         y: 24
-        width: 300
+        width: 320
         modal: false
-        visible: root.popupSpot && root.popupSpot.name
+        visible: root.popupSpot && root.popupSpot.name ? true : false
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+        background: Rectangle {
+            color: "#f7f8f4"
+            radius: 16
+            border.color: "#d2dacb"
+            border.width: 1
+            
+            layer.enabled: true
+            layer.effect: DropShadow {
+                horizontalOffset: 0
+                verticalOffset: 4
+                radius: 12
+                samples: 16
+                color: "#30000000"
+            }
+        }
 
         Column {
             spacing: 8
             width: parent.width
+            padding: 16
 
             Label {
                 text: root.popupSpot.name || ""
                 font.bold: true
-                font.pixelSize: 18
+                font.pixelSize: 20
+                color: "#333"
             }
             Label {
                 text: root.popupSpot.type || ""
-                color: "#62705d"
+                color: "#de4d3f"
+                font.pixelSize: 14
             }
             Label {
                 width: parent.width
                 text: root.popupSpot.intro || ""
                 wrapMode: Text.WordWrap
-            }
-            Label {
-                text: root.popupSpot.x !== undefined ? "坐标：" + root.popupSpot.x + ", " + root.popupSpot.y : ""
-                color: "#62705d"
+                color: "#555"
             }
         }
     }
-}
 
+    // 自动跳转到指定景点
+    function jumpToSpot(spotX, spotY) {
+        var targetX = spotX * mapLayer.scale - flickable.width / 2
+        var targetY = spotY * mapLayer.scale - flickable.height / 2
+        
+        targetX = Math.max(0, Math.min(targetX, flickable.contentWidth - flickable.width))
+        targetY = Math.max(0, Math.min(targetY, flickable.contentHeight - flickable.height))
+        
+        flickable.contentX = targetX
+        flickable.contentY = targetY
+    }
+}

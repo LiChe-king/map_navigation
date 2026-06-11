@@ -23,12 +23,13 @@ qt_add_qml_module(CampusGuide
         qml/main.qml
         qml/MapPage.qml
         qml/PathDrawer.qml
-        qml/Sidebar.qml
+        qml/MenuButton.qml
     RESOURCES
         data/spots.txt
         data/roads.txt
         data/config.txt
         data/campus_map.jpg
+        data/icon.ico
 )
 
 target_include_directories(CampusGuide PRIVATE src)
