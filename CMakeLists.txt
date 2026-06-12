@@ -30,6 +30,7 @@ qt_add_qml_module(CampusGuide
         data/config.txt
         data/campus_map.jpg
         data/icon.ico
+        data/ZiHunBianTaoTi-2.ttf
 )
 
 target_include_directories(CampusGuide PRIVATE src)

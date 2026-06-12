@@ -157,13 +157,13 @@ ApplicationWindow {
 
                 ListView {
                     id: spotListView
-                    width: parent.width
+                    anchors.fill: parent   // 替代 width: parent.width
                     model: campusBackend.spots
                     spacing: 6
                     clip: true
 
                     delegate: Rectangle {
-                        width: parent.width
+                        width: ListView.view.width   // 使用 ListView.view.width
                         height: 52
                         radius: 10
                         color: mouseArea.containsMouse ? Qt.rgba(245, 247, 242, 0.7) : "transparent"
@@ -180,14 +180,17 @@ ApplicationWindow {
                                 radius: 16
                                 color: {
                                     var typeColors = {
-                                        "景点": "#de4d3f",
-                                        "饭堂": "#e67e22", 
-                                        "卫生间": "#3498db",
-                                        "超市": "#2ecc71",
-                                        "宾馆": "#9b59b6",
-                                        "教学楼": "#1abc9c",
                                         "校门": "#f39c12",
-                                        "宿舍": "#16a085"
+                                        "餐饮食堂": "#e67e22", 
+                                        "公共教学楼": "#1abc9c",
+                                        "学院专业楼": "#9b59b6",
+                                        "体育场地": "#27ae60",
+                                        "宿舍": "#16a085",
+                                        "图书馆": "#3498db",
+                                        "诊所": "#e74c3c",
+                                        "景点": "#2ecc71",
+                                        "活动场地": "#f1c40f",
+                                        "其他": "#7f8c8d"
                                     }
                                     return typeColors[modelData.type] || (modelData.id % 2 === 0 ? "#de4d3f" : "#e67e22")
                                 }
@@ -226,7 +229,9 @@ ApplicationWindow {
                             onClicked: {
                                 currentPopupSpot = modelData
                                 currentFocusSpotId = modelData.id
-                                mapPage.jumpToSpot(modelData.x, modelData.y)
+                                if (mapPage && mapPage.jumpToSpot) {
+                                    mapPage.jumpToSpot(modelData.x, modelData.y)
+                                }
                             }
                         }
                     }
@@ -481,7 +486,7 @@ ApplicationWindow {
                     Label { text: "🏪 设施类型"; font.bold: true; color: "#2c3e2f" }
                     ComboBox {
                         id: typeCombo
-                        model: ["饭堂", "卫生间", "超市", "宾馆", "教学楼", "校门", "景点", "宿舍"]
+                        model: ["校门", "餐饮食堂", "公共教学楼", "学院专业楼", "体育场地", "宿舍", "图书馆", "诊所", "景点", "活动场地", "其他"]
                         Layout.fillWidth: true
                         background: Rectangle { color: Qt.rgba(245, 247, 242, 0.8); radius: 8; border.color: "#d2dacb" }
                     }
@@ -694,7 +699,7 @@ ApplicationWindow {
                                 Label { text: "类型:"; color: "#2c3e2f" }
                                 ComboBox {
                                     id: adminSpotType
-                                    model: ["景点", "饭堂", "卫生间", "超市", "宾馆", "教学楼", "校门", "宿舍"]
+                                    model: ["校门", "餐饮食堂", "公共教学楼", "学院专业楼", "体育场地", "宿舍", "图书馆", "诊所", "景点", "活动场地", "其他"]
                                     Layout.fillWidth: true
                                     background: Rectangle { color: Qt.rgba(245, 247, 242, 0.8); radius: 8; border.color: "#d2dacb" }
                                 }

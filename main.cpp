@@ -4,6 +4,7 @@
 #include <QUrl>
 #include <QIcon>
 #include <QWindow>
+#include <QFontDatabase>
 
 #include "CampusBackend.h"
 
@@ -12,6 +13,16 @@ int main(int argc, char *argv[])
     qputenv("QT_QUICK_CONTROLS_STYLE", "Basic");
     
     QGuiApplication app(argc, argv);
+
+    // 注册自定义字体
+    int fontId = QFontDatabase::addApplicationFont(":/qt/qml/CampusGuide/data/ZiHunBianTaoTi-2.ttf");
+    
+    if (fontId != -1) {
+        QString fontFamily = QFontDatabase::applicationFontFamilies(fontId).first();
+        qDebug() << "字体加载成功:" << fontFamily;
+    } else {
+        qDebug() << "字体加载失败，将使用默认字体";
+    }
 
     CampusBackend backend;
     backend.load();
