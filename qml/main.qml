@@ -5,810 +5,284 @@ import Qt5Compat.GraphicalEffects
 
 ApplicationWindow {
     id: window
-    width: 1280
-    height: 820
-    visible: true
+    width: 1280; height: 820; visible: true
     title: "广西大学校园导游系统"
     color: "#e8efe4"
 
-    // 地图铺满整个窗口
-    MapPage {
-        id: mapPage
-        anchors.fill: parent
-        spotsModel: campusBackend.spots
-        roadsModel: campusBackend.roads
-        pathResult: currentPathResult
-        focusSpotId: currentFocusSpotId
-        popupSpot: currentPopupSpot
-    }
-
-    // ========== 悬浮菜单栏 ==========
-    Rectangle {
-        id: menuBar
-        anchors.left: parent.left
-        anchors.top: parent.top
-        anchors.margins: 20
-        width: menuRow.implicitWidth + 32
-        height: 48
-        radius: 24
-        color: Qt.rgba(247, 248, 244, 0.95)
-        border.color: "#d2dacb"
-        border.width: 1
-
-        layer.enabled: true
-        layer.effect: DropShadow {
-            horizontalOffset: 0
-            verticalOffset: 4
-            radius: 12
-            samples: 16
-            color: "#30000000"
-        }
-
-        Row {
-            id: menuRow
-            anchors.centerIn: parent
-            spacing: 4
-            MenuButton { text: "🏠 查询"; menuId: "query" }
-            MenuButton { text: "🗺️ 路径"; menuId: "path" }
-            MenuButton { text: "📍 附近"; menuId: "nearby" }
-            MenuButton { text: "⚙️ 维护"; menuId: "admin" }
-        }
-    }
-
-    // ========== 状态变量 ==========
+    // 全局状态
+    property string pickingMode: ""
+    property string originalMenu: ""
     property string activeMenu: ""
     property var currentPathResult: ({})
     property int currentFocusSpotId: -1
     property var currentPopupSpot: ({})
+    
+    property bool editMode: false
+    property var selectedNode: null
+    property int tempEdgeFrom: -1
+    property bool hasUnsavedChanges: false
 
-    // ========== 查询弹窗 ==========
-    Popup {
+    // 统一弹窗管理函数
+    function openPopup(popupToOpen, menuName) {
+        // 关闭所有弹窗
+        if (queryPopup.visible) queryPopup.close()
+        if (pathPopup.visible) pathPopup.close()
+        if (nearbyPopup.visible) nearbyPopup.close()
+        
+        // 打开指定的弹窗
+        popupToOpen.open()
+        activeMenu = menuName
+    }
+
+    // 地图页面
+    Item {
+        id: mapContainer
+        anchors.fill: parent
+
+        MapPage {
+            id: mapPage
+            anchors.fill: parent
+            spotsModel: campusBackend.spots
+            pathResult: window.currentPathResult
+            focusSpotId: window.currentFocusSpotId
+            popupSpot: window.currentPopupSpot
+            editMode: window.editMode
+            allNodes: getAllNodesData()
+            edges: getAllEdgesData()
+            tempEdgeFrom: window.tempEdgeFrom
+            
+            onNodeMoved: function(nodeId, newX, newY) {
+                if (nodeId < 1000) {
+                    var spot = campusBackend.spotDetail(nodeId)
+                    if (spot.id) campusBackend.updateSpotOnly(nodeId, spot.name, spot.type, spot.intro, newX, newY)
+                } else {
+                    campusBackend.updateNodeOnly(nodeId, newX, newY)
+                }
+                window.hasUnsavedChanges = true
+            }
+            onEdgeAdded: function(fromId, toId) {
+                campusBackend.addEdgeOnly(fromId, toId)
+                mapPage.edges = getAllEdgesData()
+                window.hasUnsavedChanges = true
+            }
+            onEdgeRemoved: function(fromId, toId) {
+                campusBackend.removeEdgeOnly(fromId, toId)
+                mapPage.edges = getAllEdgesData()
+                window.hasUnsavedChanges = true
+            }
+            onNodeSelected: function(nodeId) {
+                window.selectedNode = findNodeById(nodeId)
+            }
+            onTempEdgeChanged: function(fromId) {
+                window.tempEdgeFrom = (fromId !== undefined && fromId !== -1) ? fromId : -1
+            }
+        }
+        
+        // 地图选点层
+        MouseArea {
+            anchors.fill: parent
+            enabled: !window.editMode && window.pickingMode !== ""
+            cursorShape: Qt.CrossCursor
+            z: 100
+            onClicked: function(mouse) {
+                var scenePos = mapPage.mapToItem(mapPage, mouse.x, mouse.y)
+                var spots = campusBackend.spots
+                var nearestId = -1, nearestName = "", minDist = 40
+                for (var i = 0; i < spots.length; i++) {
+                    var dx = spots[i].x - scenePos.x
+                    var dy = spots[i].y - scenePos.y
+                    var dist = Math.sqrt(dx*dx + dy*dy)
+                    if (dist < minDist) {
+                        minDist = dist
+                        nearestId = spots[i].id
+                        nearestName = spots[i].name
+                    }
+                }
+                if (nearestId !== -1) {
+                    if (window.pickingMode === "start") {
+                        startCombo.editText = nearestName
+                    } else if (window.pickingMode === "end") {
+                        endCombo.editText = nearestName
+                    } else if (window.pickingMode === "nearby") {
+                        centerCombo.editText = nearestName
+                    }
+                }
+                window.pickingMode = ""
+                if (window.originalMenu === "path") pathPopup.open()
+                else if (window.originalMenu === "nearby") nearbyPopup.open()
+                window.originalMenu = ""
+            }
+        }
+    }
+
+    // ========== 菜单栏 ==========
+    CustomMenuBar {
+        id: menuBar
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.margins: 20
+        editMode: window.editMode
+        
+        Component.onCompleted: {
+            // 查询按钮
+            menuBar.queryClicked.connect(function() {
+                if (window.editMode) window.editMode = false
+                openPopup(queryPopup, "query")
+            })
+            // 路径按钮
+            menuBar.pathClicked.connect(function() {
+                if (window.editMode) window.editMode = false
+                openPopup(pathPopup, "path")
+            })
+            // 附近按钮
+            menuBar.nearbyClicked.connect(function() {
+                if (window.editMode) window.editMode = false
+                openPopup(nearbyPopup, "nearby")
+            })
+            // 维护/编辑按钮
+            menuBar.adminClicked.connect(function() {
+                if (window.editMode) {
+                    // 退出编辑模式
+                    window.editMode = false
+                    window.selectedNode = null
+                    window.tempEdgeFrom = -1
+                    if (window.hasUnsavedChanges) {
+                        campusBackend.save()
+                        window.hasUnsavedChanges = false
+                    }
+                } else {
+                    // 进入编辑模式前关闭所有弹窗
+                    if (queryPopup.visible) queryPopup.close()
+                    if (pathPopup.visible) pathPopup.close()
+                    if (nearbyPopup.visible) nearbyPopup.close()
+                    window.activeMenu = ""
+                    window.editMode = true
+                }
+            })
+        }
+    }
+    
+    // 编辑面板
+    EditorPanel {
+        id: editorPanel
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.margins: 20
+        editMode: window.editMode
+        hasUnsavedChanges: window.hasUnsavedChanges
+        selectedNode: window.selectedNode
+        mapLayerScale: mapPage.mapLayerScale
+        z: 200
+        
+        onSaveRequested: {
+            campusBackend.save()
+            window.hasUnsavedChanges = false
+        }
+        onUndoRequested: {
+            campusBackend.load()
+            window.hasUnsavedChanges = false
+            mapPage.allNodes = getAllNodesData()
+            mapPage.edges = getAllEdgesData()
+        }
+        onRefreshRequested: {
+            mapPage.allNodes = getAllNodesData()
+            mapPage.edges = getAllEdgesData()
+        }
+        onUpdateSpotName: function(nodeId, newName) {
+            var spot = campusBackend.spotDetail(nodeId)
+            if (spot.id) {
+                campusBackend.updateSpotOnly(nodeId, newName, spot.type, spot.intro, spot.x, spot.y)
+                if (window.selectedNode) window.selectedNode.name = newName
+                mapPage.allNodes = getAllNodesData()
+                window.hasUnsavedChanges = true
+            }
+        }
+        onDeleteNodeRequested: function(nodeId) {
+            campusBackend.removeNodeOnly(nodeId)
+            window.selectedNode = null
+            mapPage.allNodes = getAllNodesData()
+            mapPage.edges = getAllEdgesData()
+            window.hasUnsavedChanges = true
+        }
+        onAddNodeRequested: {
+            var maxId = 1000
+            var nodes = campusBackend.nodes
+            for (var i = 0; i < nodes.length; i++) {
+                if (nodes[i].id > maxId) maxId = nodes[i].id
+            }
+            var newNodeId = maxId + 1
+            if (newNodeId < 1000) newNodeId = 1000
+            var centerX = mapContainer.width / 2 / (mapPage.mapLayerScale || 1)
+            var centerY = mapContainer.height / 2 / (mapPage.mapLayerScale || 1)
+            campusBackend.addNodeOnly(newNodeId, centerX, centerY)
+            mapPage.allNodes = getAllNodesData()
+            window.hasUnsavedChanges = true
+        }
+    }
+
+    // 弹窗定义
+    QueryPopup {
         id: queryPopup
         x: menuBar.x
         y: menuBar.y + menuBar.height + 10
-        width: 400
-        height: 480
-        modal: false
-        closePolicy: Popup.NoAutoClose
-        visible: activeMenu === "query"
-        onClosed: { if (activeMenu === "query") activeMenu = "" }
-
-        background: Rectangle {
-            color: Qt.rgba(255, 255, 255, 0.92)
-            radius: 16
-            border.color: Qt.rgba(224, 224, 224, 0.8)
-            border.width: 1
-
-            MouseArea {
-                anchors.fill: parent
-                property point dragStart
-                onPressed: (mouse) => { dragStart = Qt.point(mouse.x, mouse.y) }
-                onPositionChanged: (mouse) => {
-                    if (pressed) {
-                        queryPopup.x += mouse.x - dragStart.x
-                        queryPopup.y += mouse.y - dragStart.y
-                    }
-                }
-            }
-            layer.enabled: true
-            layer.effect: DropShadow {
-                horizontalOffset: 0
-                verticalOffset: 6
-                radius: 20
-                samples: 32
-                color: "#40000000"
-            }
+        spotsModel: campusBackend.spots
+        onSpotSelected: function(spot) {
+            window.currentPopupSpot = spot
+            window.currentFocusSpotId = spot.id
+            if (mapPage.jumpToSpot) mapPage.jumpToSpot(spot.x, spot.y)
         }
-
-        ColumnLayout {
-            anchors.fill: parent
-            spacing: 0
-
-            // 标题栏
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 52
-                color: "transparent"
-                radius: 16
-
-                Label {
-                    text: "🔍 景点查询"
-                    font.pixelSize: 16
-                    font.bold: true
-                    anchors.left: parent.left
-                    anchors.leftMargin: 18
-                    anchors.verticalCenter: parent.verticalCenter
-                    color: "#2c3e2f"
-                }
-
-                Button {
-                    text: "✕"
-                    flat: true
-                    anchors.right: parent.right
-                    anchors.rightMargin: 12
-                    anchors.verticalCenter: parent.verticalCenter
-                    onClicked: activeMenu = ""
-                    font.pixelSize: 16
-                    background: Rectangle {
-                        radius: 14
-                        color: parent.hovered ? Qt.rgba(224, 229, 216, 0.6) : "transparent"
-                    }
-                    contentItem: Text {
-                        text: "✕"
-                        color: "#8f9b8a"
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                    }
-                }
-
-                Rectangle {
-                    anchors.bottom: parent.bottom
-                    width: parent.width
-                    height: 1
-                    color: Qt.rgba(224, 229, 216, 0.6)
-                }
-            }
-
-            ScrollView {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                clip: true
-                padding: 8
-
-                ListView {
-                    id: spotListView
-                    anchors.fill: parent   // 替代 width: parent.width
-                    model: campusBackend.spots
-                    spacing: 6
-                    clip: true
-
-                    delegate: Rectangle {
-                        width: ListView.view.width   // 使用 ListView.view.width
-                        height: 52
-                        radius: 10
-                        color: mouseArea.containsMouse ? Qt.rgba(245, 247, 242, 0.7) : "transparent"
-
-                        RowLayout {
-                            anchors.fill: parent
-                            anchors.leftMargin: 12
-                            anchors.rightMargin: 12
-                            spacing: 12
-
-                            Rectangle {
-                                width: 32
-                                height: 32
-                                radius: 16
-                                color: {
-                                    var typeColors = {
-                                        "校门": "#f39c12",
-                                        "餐饮食堂": "#e67e22", 
-                                        "公共教学楼": "#1abc9c",
-                                        "学院专业楼": "#9b59b6",
-                                        "体育场地": "#27ae60",
-                                        "宿舍": "#16a085",
-                                        "图书馆": "#3498db",
-                                        "诊所": "#e74c3c",
-                                        "景点": "#2ecc71",
-                                        "活动场地": "#f1c40f",
-                                        "其他": "#7f8c8d"
-                                    }
-                                    return typeColors[modelData.type] || (modelData.id % 2 === 0 ? "#de4d3f" : "#e67e22")
-                                }
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: modelData.id
-                                    color: "white"
-                                    font.bold: true
-                                }
-                            }
-
-                            ColumnLayout {
-                                spacing: 2
-                                Layout.fillWidth: true
-                                Label {
-                                    text: modelData.name
-                                    font.bold: true
-                                    color: "#2c3e2f"
-                                }
-                                Label {
-                                    text: modelData.type + (modelData.intro ? " · " + modelData.intro : "")
-                                    color: "#8f9b8a"
-                                    font.pixelSize: 11
-                                    wrapMode: Text.NoWrap
-                                    elide: Text.ElideRight
-                                    Layout.fillWidth: true
-                                }
-                            }
-                        }
-
-                        MouseArea {
-                            id: mouseArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                currentPopupSpot = modelData
-                                currentFocusSpotId = modelData.id
-                                if (mapPage && mapPage.jumpToSpot) {
-                                    mapPage.jumpToSpot(modelData.x, modelData.y)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+        onClosed: {
+            if (window.activeMenu === "query") window.activeMenu = ""
         }
     }
-
-    // ========== 路径规划弹窗 ==========
-    Popup {
+    
+    PathPopup {
         id: pathPopup
         x: menuBar.x
         y: menuBar.y + menuBar.height + 10
-        width: 420
-        height: 480
-        modal: false
-        closePolicy: Popup.NoAutoClose
-        visible: activeMenu === "path"
-        onClosed: { if (activeMenu === "path") activeMenu = "" }
-
-        background: Rectangle {
-            color: Qt.rgba(255, 255, 255, 0.92)
-            radius: 16
-            border.color: Qt.rgba(224, 224, 224, 0.8)
-            border.width: 1
-
-            MouseArea {
-                anchors.fill: parent
-                property point dragStart
-                onPressed: (mouse) => { dragStart = Qt.point(mouse.x, mouse.y) }
-                onPositionChanged: (mouse) => {
-                    if (pressed) {
-                        pathPopup.x += mouse.x - dragStart.x
-                        pathPopup.y += mouse.y - dragStart.y
-                    }
-                }
-            }
-            layer.enabled: true
-            layer.effect: DropShadow {
-                horizontalOffset: 0
-                verticalOffset: 6
-                radius: 20
-                samples: 32
-                color: "#40000000"
-            }
+        spotsModel: campusBackend.spots
+        backend: campusBackend
+        getSpotIdByNameFn: getSpotIdByName
+        onMapPickRequested: function(mode) {
+            pathPopup.close()
+            window.pickingMode = mode
+            window.originalMenu = "path"
         }
-
-        ColumnLayout {
-            anchors.fill: parent
-            spacing: 0
-
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 52
-                color: "transparent"
-                radius: 16
-
-                Label {
-                    text: "🗺️ 最短路径"
-                    font.pixelSize: 16
-                    font.bold: true
-                    anchors.left: parent.left
-                    anchors.leftMargin: 18
-                    anchors.verticalCenter: parent.verticalCenter
-                    color: "#2c3e2f"
-                }
-
-                Button {
-                    text: "✕"
-                    flat: true
-                    anchors.right: parent.right
-                    anchors.rightMargin: 12
-                    anchors.verticalCenter: parent.verticalCenter
-                    onClicked: activeMenu = ""
-                    background: Rectangle { radius: 14; color: parent.hovered ? Qt.rgba(224, 229, 216, 0.6) : "transparent" }
-                    contentItem: Text { text: "✕"; color: "#8f9b8a" }
-                }
-
-                Rectangle {
-                    anchors.bottom: parent.bottom
-                    width: parent.width
-                    height: 1
-                    color: Qt.rgba(224, 229, 216, 0.6)
-                }
-            }
-
-            ScrollView {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                clip: true
-                padding: 20
-
-                ColumnLayout {
-                    width: parent.width
-                    spacing: 16
-
-                    Label { text: "🚩 起点"; font.bold: true; color: "#2c3e2f" }
-                    ComboBox {
-                        id: startCombo
-                        Layout.fillWidth: true
-                        model: campusBackend.spots
-                        textRole: "displayName"
-                        editable: true
-                        background: Rectangle { color: Qt.rgba(245, 247, 242, 0.8); radius: 8; border.color: "#d2dacb" }
-                    }
-
-                    Label { text: "🏁 终点"; font.bold: true; color: "#2c3e2f" }
-                    ComboBox {
-                        id: endCombo
-                        Layout.fillWidth: true
-                        model: campusBackend.spots
-                        textRole: "displayName"
-                        editable: true
-                        background: Rectangle { color: Qt.rgba(245, 247, 242, 0.8); radius: 8; border.color: "#d2dacb" }
-                    }
-
-                    Button {
-                        text: "✨ 查询路径"
-                        Layout.fillWidth: true
-                        background: Rectangle { radius: 20; color: "#de4d3f" }
-                        contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter }
-                        onClicked: {
-                            var startId = getSpotIdByName(startCombo.editText)
-                            var endId = getSpotIdByName(endCombo.editText)
-                            var result = campusBackend.findShortestPath(startId, endId)
-                            currentPathResult = result
-                            pathResultText.text = result.length > 0
-                                ? result.names.join(" → ") + "\n\n📏 总距离：" + result.length + " 米"
-                                : "❌ 未找到可达路径"
-                        }
-                    }
-
-                    Rectangle {
-                        Layout.fillWidth: true
-                        height: 120
-                        color: Qt.rgba(245, 247, 242, 0.7)
-                        radius: 12
-                        border.color: Qt.rgba(224, 229, 216, 0.6)
-                        TextArea {
-                            id: pathResultText
-                            anchors.fill: parent
-                            anchors.margins: 12
-                            readOnly: true
-                            wrapMode: Text.WordWrap
-                            placeholderText: "路径结果将显示在这里"
-                            background: null
-                            font.pixelSize: 13
-                        }
-                    }
-                }
-            }
+        onPathCalculated: function(result) {
+            window.currentPathResult = result
+        }
+        onCloseRequested: function() {
+            // 可选：清除路径显示等
+        }
+        onClosed: {
+            if (window.activeMenu === "path") window.activeMenu = ""
         }
     }
-
-    // ========== 附近搜索弹窗 ==========
-    Popup {
+    
+    NearbyPopup {
         id: nearbyPopup
         x: menuBar.x
         y: menuBar.y + menuBar.height + 10
-        width: 400
-        height: 500
-        modal: false
-        closePolicy: Popup.NoAutoClose
-        visible: activeMenu === "nearby"
-        onClosed: { if (activeMenu === "nearby") activeMenu = "" }
-
-        background: Rectangle {
-            color: Qt.rgba(255, 255, 255, 0.92)
-            radius: 16
-            border.color: Qt.rgba(224, 224, 224, 0.8)
-            border.width: 1
-
-            MouseArea {
-                anchors.fill: parent
-                property point dragStart
-                onPressed: (mouse) => { dragStart = Qt.point(mouse.x, mouse.y) }
-                onPositionChanged: (mouse) => {
-                    if (pressed) {
-                        nearbyPopup.x += mouse.x - dragStart.x
-                        nearbyPopup.y += mouse.y - dragStart.y
-                    }
-                }
-            }
-            layer.enabled: true
-            layer.effect: DropShadow {
-                horizontalOffset: 0
-                verticalOffset: 6
-                radius: 20
-                samples: 32
-                color: "#40000000"
-            }
+        spotsModel: campusBackend.spots
+        backend: campusBackend
+        getSpotIdByNameFn: getSpotIdByName
+        onMapPickRequested: function(mode) {
+            nearbyPopup.close()
+            window.pickingMode = mode
+            window.originalMenu = "nearby"
         }
-
-        ColumnLayout {
-            anchors.fill: parent
-            spacing: 0
-
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 52
-                color: "transparent"
-                radius: 16
-
-                Label {
-                    text: "📍 附近设施"
-                    font.pixelSize: 16
-                    font.bold: true
-                    anchors.left: parent.left
-                    anchors.leftMargin: 18
-                    anchors.verticalCenter: parent.verticalCenter
-                    color: "#2c3e2f"
-                }
-
-                Button {
-                    text: "✕"
-                    flat: true
-                    anchors.right: parent.right
-                    anchors.rightMargin: 12
-                    anchors.verticalCenter: parent.verticalCenter
-                    onClicked: activeMenu = ""
-                    background: Rectangle { radius: 14; color: parent.hovered ? Qt.rgba(224, 229, 216, 0.6) : "transparent" }
-                    contentItem: Text { text: "✕"; color: "#8f9b8a" }
-                }
-
-                Rectangle {
-                    anchors.bottom: parent.bottom
-                    width: parent.width
-                    height: 1
-                    color: Qt.rgba(224, 229, 216, 0.6)
-                }
-            }
-
-            ScrollView {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                clip: true
-                padding: 20
-
-                ColumnLayout {
-                    width: parent.width
-                    spacing: 16
-
-                    Label { text: "📍 当前位置"; font.bold: true; color: "#2c3e2f" }
-                    ComboBox {
-                        id: centerCombo
-                        Layout.fillWidth: true
-                        model: campusBackend.spots
-                        textRole: "displayName"
-                        background: Rectangle { color: Qt.rgba(245, 247, 242, 0.8); radius: 8; border.color: "#d2dacb" }
-                    }
-
-                    Label { text: "🏪 设施类型"; font.bold: true; color: "#2c3e2f" }
-                    ComboBox {
-                        id: typeCombo
-                        model: ["校门", "餐饮食堂", "公共教学楼", "学院专业楼", "体育场地", "宿舍", "图书馆", "诊所", "景点", "活动场地", "其他"]
-                        Layout.fillWidth: true
-                        background: Rectangle { color: Qt.rgba(245, 247, 242, 0.8); radius: 8; border.color: "#d2dacb" }
-                    }
-
-                    Button {
-                        text: "🔍 搜索附近"
-                        Layout.fillWidth: true
-                        background: Rectangle { radius: 20; color: "#de4d3f" }
-                        contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter }
-                        onClicked: {
-                            var centerId = getSpotIdByName(centerCombo.editText)
-                            var result = campusBackend.findNearby(centerId, typeCombo.currentText, 5)
-                            nearbyListModel.clear()
-                            for (var i = 0; i < result.length; i++) {
-                                nearbyListModel.append(result[i])
-                            }
-                        }
-                    }
-
-                    Label { text: "📋 搜索结果"; font.bold: true; color: "#2c3e2f" }
-                    ListView {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 200
-                        clip: true
-                        model: ListModel { id: nearbyListModel }
-                        spacing: 6
-
-                        delegate: Rectangle {
-                            width: parent.width
-                            height: 48
-                            radius: 10
-                            color: mouseArea.containsMouse ? Qt.rgba(245, 247, 242, 0.7) : "transparent"
-
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 12
-                                anchors.rightMargin: 12
-                                Label {
-                                    text: model.spot.name
-                                    font.bold: true
-                                    color: "#2c3e2f"
-                                    Layout.fillWidth: true
-                                }
-                                Rectangle {
-                                    implicitWidth: distLabel.implicitWidth + 12
-                                    implicitHeight: distLabel.implicitHeight + 8
-                                    radius: 12
-                                    color: Qt.rgba(224, 229, 216, 0.8)
-                                    Label {
-                                        id: distLabel
-                                        anchors.centerIn: parent
-                                        text: model.distance + "米"
-                                        color: "#de4d3f"
-                                        font.pixelSize: 11
-                                    }
-                                }
-                            }
-
-                            MouseArea {
-                                id: mouseArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    var result = campusBackend.findShortestPath(centerCombo.currentValue, model.spot.id)
-                                    currentPathResult = result
-                                    activeMenu = ""
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+        onPathCalculated: function(result) {
+            window.currentPathResult = result
+        }
+        onCloseRequested: function() {
+            // 可选：清理附近搜索状态
+        }
+        onClosed: {
+            if (window.activeMenu === "nearby") window.activeMenu = ""
         }
     }
 
-    // ========== 后台维护弹窗 ==========
-    Popup {
-        id: adminPopup
-        x: menuBar.x
-        y: menuBar.y + menuBar.height + 10
-        width: 460
-        height: 580
-        modal: false
-        closePolicy: Popup.NoAutoClose
-        visible: activeMenu === "admin"
-        onClosed: { if (activeMenu === "admin") activeMenu = "" }
-
-        background: Rectangle {
-            color: Qt.rgba(255, 255, 255, 0.92)
-            radius: 16
-            border.color: Qt.rgba(224, 224, 224, 0.8)
-            border.width: 1
-
-            MouseArea {
-                anchors.fill: parent
-                property point dragStart
-                onPressed: (mouse) => { dragStart = Qt.point(mouse.x, mouse.y) }
-                onPositionChanged: (mouse) => {
-                    if (pressed) {
-                        adminPopup.x += mouse.x - dragStart.x
-                        adminPopup.y += mouse.y - dragStart.y
-                    }
-                }
-            }
-            layer.enabled: true
-            layer.effect: DropShadow {
-                horizontalOffset: 0
-                verticalOffset: 6
-                radius: 20
-                samples: 32
-                color: "#40000000"
-            }
-        }
-
-        ColumnLayout {
-            anchors.fill: parent
-            spacing: 0
-
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 52
-                color: "transparent"
-                radius: 16
-
-                Label {
-                    text: "⚙️ 数据维护"
-                    font.pixelSize: 16
-                    font.bold: true
-                    anchors.left: parent.left
-                    anchors.leftMargin: 18
-                    anchors.verticalCenter: parent.verticalCenter
-                    color: "#2c3e2f"
-                }
-
-                Button {
-                    text: "✕"
-                    flat: true
-                    anchors.right: parent.right
-                    anchors.rightMargin: 12
-                    anchors.verticalCenter: parent.verticalCenter
-                    onClicked: activeMenu = ""
-                    background: Rectangle { radius: 14; color: parent.hovered ? Qt.rgba(224, 229, 216, 0.6) : "transparent" }
-                    contentItem: Text { text: "✕"; color: "#8f9b8a" }
-                }
-
-                Rectangle {
-                    anchors.bottom: parent.bottom
-                    width: parent.width
-                    height: 1
-                    color: Qt.rgba(224, 229, 216, 0.6)
-                }
-            }
-
-            ScrollView {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                clip: true
-                padding: 20
-
-                ColumnLayout {
-                    width: parent.width
-                    spacing: 16
-
-                    TabBar {
-                        id: adminTabs
-                        Layout.fillWidth: true
-                        background: Rectangle { color: Qt.rgba(245, 247, 242, 0.8); radius: 12 }
-                        TabButton {
-                            text: "🏛️ 景点管理"
-                            background: Rectangle {
-                                radius: 10
-                                color: parent.checked ? "#de4d3f" : "transparent"
-                            }
-                        }
-                        TabButton {
-                            text: "🛣️ 道路管理"
-                            background: Rectangle {
-                                radius: 10
-                                color: parent.checked ? "#de4d3f" : "transparent"
-                            }
-                        }
-                    }
-
-                    StackLayout {
-                        currentIndex: adminTabs.currentIndex
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 380
-
-                        ColumnLayout {
-                            spacing: 12
-                            GridLayout {
-                                columns: 2
-                                Layout.fillWidth: true
-                                columnSpacing: 12
-                                rowSpacing: 10
-
-                                Label { text: "ID:"; color: "#2c3e2f" }
-                                TextField {
-                                    id: adminSpotId
-                                    Layout.fillWidth: true
-                                    background: Rectangle { color: Qt.rgba(245, 247, 242, 0.8); radius: 8; border.color: "#d2dacb" }
-                                }
-                                Label { text: "名称:"; color: "#2c3e2f" }
-                                TextField {
-                                    id: adminSpotName
-                                    Layout.fillWidth: true
-                                    background: Rectangle { color: Qt.rgba(245, 247, 242, 0.8); radius: 8; border.color: "#d2dacb" }
-                                }
-                                Label { text: "类型:"; color: "#2c3e2f" }
-                                ComboBox {
-                                    id: adminSpotType
-                                    model: ["校门", "餐饮食堂", "公共教学楼", "学院专业楼", "体育场地", "宿舍", "图书馆", "诊所", "景点", "活动场地", "其他"]
-                                    Layout.fillWidth: true
-                                    background: Rectangle { color: Qt.rgba(245, 247, 242, 0.8); radius: 8; border.color: "#d2dacb" }
-                                }
-                                Label { text: "X坐标:"; color: "#2c3e2f" }
-                                TextField {
-                                    id: adminSpotX
-                                    Layout.fillWidth: true
-                                    background: Rectangle { color: Qt.rgba(245, 247, 242, 0.8); radius: 8; border.color: "#d2dacb" }
-                                }
-                                Label { text: "Y坐标:"; color: "#2c3e2f" }
-                                TextField {
-                                    id: adminSpotY
-                                    Layout.fillWidth: true
-                                    background: Rectangle { color: Qt.rgba(245, 247, 242, 0.8); radius: 8; border.color: "#d2dacb" }
-                                }
-                                Label { text: "简介:"; color: "#2c3e2f" }
-                                TextField {
-                                    id: adminSpotIntro
-                                    Layout.fillWidth: true
-                                    Layout.columnSpan: 2
-                                    background: Rectangle { color: Qt.rgba(245, 247, 242, 0.8); radius: 8; border.color: "#d2dacb" }
-                                }
-                            }
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 12
-                                Button {
-                                    text: "💾 保存"
-                                    Layout.fillWidth: true
-                                    background: Rectangle { radius: 20; color: "#de4d3f" }
-                                    contentItem: Text {
-                                        text: parent.text
-                                        color: "white"
-                                        horizontalAlignment: Text.AlignHCenter
-                                    }
-                                }
-                                Button {
-                                    text: "🗑️ 删除"
-                                    Layout.fillWidth: true
-                                    background: Rectangle { radius: 20; color: "#8f9b8a" }
-                                    contentItem: Text {
-                                        text: parent.text
-                                        color: "white"
-                                        horizontalAlignment: Text.AlignHCenter
-                                    }
-                                }
-                            }
-                        }
-
-                        ColumnLayout {
-                            spacing: 12
-                            GridLayout {
-                                columns: 2
-                                Layout.fillWidth: true
-                                columnSpacing: 12
-                                rowSpacing: 10
-                                Label { text: "起点ID:"; color: "#2c3e2f" }
-                                TextField {
-                                    id: adminRoadFrom
-                                    Layout.fillWidth: true
-                                    background: Rectangle { color: Qt.rgba(245, 247, 242, 0.8); radius: 8; border.color: "#d2dacb" }
-                                }
-                                Label { text: "终点ID:"; color: "#2c3e2f" }
-                                TextField {
-                                    id: adminRoadTo
-                                    Layout.fillWidth: true
-                                    background: Rectangle { color: Qt.rgba(245, 247, 242, 0.8); radius: 8; border.color: "#d2dacb" }
-                                }
-                                Label { text: "路点序列:"; color: "#2c3e2f"; Layout.rowSpan: 2 }
-                                TextArea {
-                                    id: adminRoadPoints
-                                    Layout.fillWidth: true
-                                    Layout.preferredHeight: 80
-                                    placeholderText: "x y x y x y"
-                                    background: Rectangle { color: Qt.rgba(245, 247, 242, 0.8); radius: 8; border.color: "#d2dacb" }
-                                }
-                            }
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 12
-                                Button {
-                                    text: "💾 保存"
-                                    Layout.fillWidth: true
-                                    background: Rectangle { radius: 20; color: "#de4d3f" }
-                                    contentItem: Text {
-                                        text: parent.text
-                                        color: "white"
-                                        horizontalAlignment: Text.AlignHCenter
-                                    }
-                                }
-                                Button {
-                                    text: "🗑️ 删除"
-                                    Layout.fillWidth: true
-                                    background: Rectangle { radius: 20; color: "#8f9b8a" }
-                                    contentItem: Text {
-                                        text: parent.text
-                                        color: "white"
-                                        horizontalAlignment: Text.AlignHCenter
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // ========== 辅助函数 ==========
+    // 辅助函数
     function getSpotIdByName(name) {
         var spots = campusBackend.spots
         for (var i = 0; i < spots.length; i++) {
@@ -816,6 +290,30 @@ ApplicationWindow {
                 return spots[i].id
             }
         }
-        return parseInt(name) || 1
+        var num = parseInt(name)
+        return isNaN(num) ? 1 : num
+    }
+    
+    function getAllNodesData() {
+        var nodes = []
+        for (var i = 0; i < campusBackend.spots.length; i++) {
+            nodes.push(JSON.parse(JSON.stringify(campusBackend.spots[i])))
+        }
+        for (var j = 0; j < campusBackend.nodes.length; j++) {
+            nodes.push(JSON.parse(JSON.stringify(campusBackend.nodes[j])))
+        }
+        return nodes
+    }
+    
+    function getAllEdgesData() {
+        return campusBackend.edges || []
+    }
+    
+    function findNodeById(id) {
+        var nodes = getAllNodesData()
+        for (var i = 0; i < nodes.length; i++) {
+            if (nodes[i].id === id) return nodes[i]
+        }
+        return null
     }
 }

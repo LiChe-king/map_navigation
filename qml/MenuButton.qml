@@ -1,6 +1,5 @@
 import QtQuick
 import QtQuick.Controls
-import Qt5Compat.GraphicalEffects
 
 Button {
     id: root
@@ -24,7 +23,5 @@ Button {
         color: root.hovered ? "#f0f0f0" : "transparent"
     }
     
-    onClicked: {
-        window.activeMenu = menuId
-    }
+    // 按钮只负责发射信号，具体逻辑由父组件处理
 }

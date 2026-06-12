@@ -1,112 +1,94 @@
 #include "PathFinder.h"
-
-#include <limits>
-
 #include "MinHeap.h"
+#include <limits>
+#include <algorithm>
 
-PathFinder::PathFinder(const CampusGraph *graph)
-    : graph(graph)
-{
-}
+PathFinder::PathFinder(const CampusGraph* graph) : graph(graph) {}
 
-// Dijkstra: time O((V+E)logV), space O(V). The heap is implemented in MinHeap.h.
-PathResult PathFinder::shortestPath(int fromId, int toId) const
-{
+PathResult PathFinder::shortestPath(int fromId, int toId) const {
     PathResult result;
-    if (!graph) {
-        return result;
+    if (!graph) return result;
+    
+    // 检查节点是否存在
+    if (!graph->hasNode(fromId) || !graph->hasNode(toId)) return result;
+    
+    const auto& adj = graph->getAdjacency();
+    const auto& nodes = graph->getAllNodes();
+    int n = nodes.size();
+    
+    const int INF = std::numeric_limits<int>::max() / 4;
+    std::vector<int> dist(n, INF);
+    std::vector<int> prev(n, -1);
+    std::vector<bool> visited(n, false);
+    
+    int startIdx = -1, targetIdx = -1;
+    for (int i = 0; i < n; ++i) {
+        if (nodes[i].id == fromId) startIdx = i;
+        if (nodes[i].id == toId) targetIdx = i;
     }
-
-    const int start = graph->indexOfSpot(fromId);
-    const int target = graph->indexOfSpot(toId);
-    if (start < 0 || target < 0) {
-        return result;
-    }
-
-    const int n = graph->spotCount();
-    const int infinity = std::numeric_limits<int>::max() / 4;
-    std::vector<int> dist(n, infinity);
-    std::vector<int> previous(n, -1);
-    std::vector<bool> done(n, false);
-
+    if (startIdx < 0 || targetIdx < 0) return result;
+    
     MinHeap heap;
-    dist[start] = 0;
-    heap.push({start, 0});
-
+    dist[startIdx] = 0;
+    heap.push({startIdx, 0});
+    
     while (!heap.isEmpty()) {
-        const HeapNode node = heap.pop();
-        if (done[node.vertex]) {
-            continue;
-        }
-        done[node.vertex] = true;
-        if (node.vertex == target) {
-            break;
-        }
-
-        const std::vector<std::vector<Edge>> &adj = graph->adjacencyList();
-        for (const Edge &edge : adj[node.vertex]) {
-            if (done[edge.to]) {
-                continue;
-            }
-
-            const int candidate = dist[node.vertex] + edge.weight;
+        HeapNode node = heap.pop();
+        if (visited[node.vertex]) continue;
+        visited[node.vertex] = true;
+        if (node.vertex == targetIdx) break;
+        
+        for (const Edge& edge : adj[node.vertex]) {
+            if (visited[edge.to]) continue;
+            int candidate = dist[node.vertex] + edge.weight;
             if (candidate < dist[edge.to]) {
                 dist[edge.to] = candidate;
-                previous[edge.to] = node.vertex;
+                prev[edge.to] = node.vertex;
                 heap.push({edge.to, candidate});
             }
         }
     }
-
-    if (dist[target] == infinity) {
-        return result;
+    
+    if (dist[targetIdx] == INF) return result;
+    
+    // 重建路径
+    std::vector<int> indices;
+    for (int at = targetIdx; at != -1; at = prev[at]) {
+        indices.push_back(at);
     }
-
-    std::vector<int> reversed;
-    for (int at = target; at != -1; at = previous[at]) {
-        reversed.push_back(at);
-    }
-
-    std::vector<int> indexes;
-    for (int i = static_cast<int>(reversed.size()) - 1; i >= 0; --i) {
-        indexes.push_back(reversed[i]);
-    }
-    return buildPathFromIndexes(indexes, dist[target]);
+    std::reverse(indices.begin(), indices.end());
+    
+    return buildPathFromNodeIndices(indices, dist[targetIdx]);
 }
 
-std::vector<PathResult> PathFinder::allSimplePaths(int fromId, int toId, int maxCount) const
-{
-    std::vector<PathResult> result;
-    if (!graph || maxCount <= 0) {
-        return result;
+PathResult PathFinder::buildPathFromNodeIndices(const std::vector<int>& indices, int length) const {
+    PathResult result;
+    result.totalLength = length;
+    
+    const auto& nodes = graph->getAllNodes();
+    for (int idx : indices) {
+        const Node& node = nodes[idx];
+        result.nodeIds.push_back(node.id);
+        result.drawPoints.push_back({node.x, node.y});
+        
+        // 如果是景点，加入 spotIds
+        if (node.id < 1000 || graph->getSpotById(node.id)) {
+            result.spotIds.push_back(node.id);
+        }
     }
-
-    const int start = graph->indexOfSpot(fromId);
-    const int target = graph->indexOfSpot(toId);
-    if (start < 0 || target < 0) {
-        return result;
-    }
-
-    std::vector<bool> visited(graph->spotCount(), false);
-    std::vector<int> path;
-    dfsAllPaths(start, target, visited, path, 0, result, maxCount);
+    
     return result;
 }
 
-std::vector<NearbyResult> PathFinder::nearestByType(int fromId, const std::string &type, int limit) const
-{
+std::vector<NearbyResult> PathFinder::nearestByType(int fromId, const std::string& type, int limit) const {
     std::vector<NearbyResult> results;
-    if (!graph || limit <= 0) {
-        return results;
-    }
-
-    for (const Spot &spot : graph->allSpots()) {
-        if (spot.id == fromId || spot.type != type) {
-            continue;
-        }
-
+    if (!graph || limit <= 0) return results;
+    
+    for (const Spot& spot : graph->getAllSpots()) {
+        if (spot.id == fromId || spot.type != type) continue;
+        
         PathResult path = shortestPath(fromId, spot.id);
-        if (!path.spotIds.empty()) {
+        if (!path.nodeIds.empty()) {
             NearbyResult item;
             item.spotId = spot.id;
             item.distance = path.totalLength;
@@ -114,96 +96,14 @@ std::vector<NearbyResult> PathFinder::nearestByType(int fromId, const std::strin
             results.push_back(item);
         }
     }
-
+    
     sortNearbyByDistance(results);
-    if (static_cast<int>(results.size()) > limit) {
-        results.resize(limit);
-    }
+    if ((int)results.size() > limit) results.resize(limit);
     return results;
 }
 
-// DFS all simple paths: worst-case exponential, space O(V) for recursion and visited marks.
-void PathFinder::dfsAllPaths(int currentIndex,
-                             int targetIndex,
-                             std::vector<bool> &visited,
-                             std::vector<int> &path,
-                             int length,
-                             std::vector<PathResult> &result,
-                             int maxCount) const
-{
-    if (static_cast<int>(result.size()) >= maxCount) {
-        return;
-    }
-
-    visited[currentIndex] = true;
-    path.push_back(currentIndex);
-
-    if (currentIndex == targetIndex) {
-        result.push_back(buildPathFromIndexes(path, length));
-    } else {
-        const std::vector<std::vector<Edge>> &adj = graph->adjacencyList();
-        for (const Edge &edge : adj[currentIndex]) {
-            if (!visited[edge.to]) {
-                dfsAllPaths(edge.to, targetIndex, visited, path, length + edge.weight, result, maxCount);
-            }
-        }
-    }
-
-    path.pop_back();
-    visited[currentIndex] = false;
-}
-
-PathResult PathFinder::buildPathFromIndexes(const std::vector<int> &indexes, int length) const
-{
-    PathResult path;
-    path.totalLength = length;
-
-    for (int index : indexes) {
-        const Spot *spot = graph->spotAtIndex(index);
-        if (spot) {
-            path.spotIds.push_back(spot->id);
-        }
-    }
-
-    for (int i = 1; i < static_cast<int>(path.spotIds.size()); ++i) {
-        appendRoadPoints(path, path.spotIds[i - 1], path.spotIds[i]);
-    }
-    return path;
-}
-
-void PathFinder::appendRoadPoints(PathResult &path, int fromId, int toId) const
-{
-    for (const RoadWithPoints &road : graph->allRoads()) {
-        const bool forward = road.from == fromId && road.to == toId;
-        const bool reverse = road.from == toId && road.to == fromId;
-        if (!forward && !reverse) {
-            continue;
-        }
-
-        if (forward) {
-            for (const Waypoint &point : road.points) {
-                if (!path.drawPoints.empty() && path.drawPoints.back().x == point.x && path.drawPoints.back().y == point.y) {
-                    continue;
-                }
-                path.drawPoints.push_back(point);
-            }
-        } else {
-            for (int i = static_cast<int>(road.points.size()) - 1; i >= 0; --i) {
-                const Waypoint &point = road.points[i];
-                if (!path.drawPoints.empty() && path.drawPoints.back().x == point.x && path.drawPoints.back().y == point.y) {
-                    continue;
-                }
-                path.drawPoints.push_back(point);
-            }
-        }
-        return;
-    }
-}
-
-// Insertion sort: time O(n^2), space O(1).
-void PathFinder::sortNearbyByDistance(std::vector<NearbyResult> &items) const
-{
-    for (int i = 1; i < static_cast<int>(items.size()); ++i) {
+void PathFinder::sortNearbyByDistance(std::vector<NearbyResult>& items) const {
+    for (int i = 1; i < (int)items.size(); ++i) {
         NearbyResult key = items[i];
         int j = i - 1;
         while (j >= 0 && items[j].distance > key.distance) {
@@ -212,4 +112,10 @@ void PathFinder::sortNearbyByDistance(std::vector<NearbyResult> &items) const
         }
         items[j + 1] = key;
     }
+}
+
+std::vector<PathResult> PathFinder::allSimplePaths(int fromId, int toId, int maxCount) const {
+    std::vector<PathResult> results;
+    // 可选的 DFS 实现，暂略
+    return results;
 }

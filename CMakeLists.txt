@@ -14,6 +14,7 @@ qt_add_executable(CampusGuide
     src/CampusBackend.cpp
     src/CampusGraph.cpp
     src/PathFinder.cpp
+    src/RoadNetwork.cpp
 )
 
 qt_add_qml_module(CampusGuide
@@ -24,9 +25,15 @@ qt_add_qml_module(CampusGuide
         qml/MapPage.qml
         qml/PathDrawer.qml
         qml/MenuButton.qml
+        qml/EditorPanel.qml
+        qml/CustomMenuBar.qml
+        qml/PathPopup.qml
+        qml/NearbyPopup.qml
+        qml/QueryPopup.qml
     RESOURCES
         data/spots.txt
-        data/roads.txt
+        data/nodes.txt
+        data/edges.txt
         data/config.txt
         data/campus_map.jpg
         data/icon.ico
