@@ -100,7 +100,7 @@ Item {
 
             MapEdgesLayer {
                 anchors.fill: parent
-                editMode: root.editMode && root.editTool === "select"
+                editMode: root.editMode
                 edges: root.edges
                 allNodes: root.allNodes
                 previewNodeId: root.previewNodeId
@@ -142,13 +142,6 @@ Item {
                 }
             }
 
-            TempEdgeLine {
-                anchors.fill: parent
-                editMode: root.editMode
-                tempEdgeFrom: root.tempEdgeFrom
-                allNodes: root.allNodes
-            }
-
             SpotMarkersLayer {
                 anchors.fill: parent
                 z: 1
@@ -170,7 +163,7 @@ Item {
             target: null
             onWheel: function(event) {
                 var oldScale = mapLayer.scale
-                var nextScale = Math.max(0.35, Math.min(1.8, oldScale + event.angleDelta.y / 1200))
+                var nextScale = Math.max(0.33, Math.min(1.8, oldScale + event.angleDelta.y / 1200))
                 if (nextScale === oldScale) return
 
                 var anchorX = root.lastMouseX

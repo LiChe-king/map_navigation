@@ -14,7 +14,7 @@ DraggablePopup {
     signal mapPickRequested(string mode)
     signal closeRequested()
 
-    width: 460
+    width: 400
     height: 540
     titleText: "🧭 最短路径"
 

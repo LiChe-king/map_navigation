@@ -110,7 +110,7 @@ Item {
         for (var j = 0; j < root.backend.nodes.length; j++) {
             nodes.push(JSON.parse(JSON.stringify(root.backend.nodes[j])))
         }
-        return nodes
+        return root.backend ? root.backend.nodes : []
     }
 
     function getAllEdgesData() {
@@ -120,7 +120,22 @@ Item {
     function findNodeById(id) {
         var nodes = getAllNodesData()
         for (var i = 0; i < nodes.length; i++) {
-            if (nodes[i].id === id) return nodes[i]
+            if (nodes[i].id === id) {
+                var node = nodes[i]
+                // 如果是景点，从 spots 中补充完整信息
+                if (id < 1000 && root.backend) {
+                    var spots = root.backend.spots
+                    for (var j = 0; j < spots.length; j++) {
+                        if (spots[j].id === id) {
+                            node.name = spots[j].name
+                            node.type = spots[j].type
+                            node.intro = spots[j].intro
+                            break
+                        }
+                    }
+                }
+                return node
+            }
         }
         return null
     }

@@ -15,9 +15,7 @@ Item {
     onEdgesChanged: edgesCanvas.requestPaint()
     onAllNodesChanged: edgesCanvas.requestPaint()
     onEditModeChanged: edgesCanvas.requestPaint()
-    onPreviewNodeIdChanged: edgesCanvas.requestPaint()
-    onPreviewNodeXChanged: edgesCanvas.requestPaint()
-    onPreviewNodeYChanged: edgesCanvas.requestPaint()
+    // 移除 onPreviewNodeIdChanged 等绑定，避免拖拽时频繁重绘
 
     Canvas {
         id: edgesCanvas
@@ -70,9 +68,7 @@ Item {
     }
 
     function findNodeById(id) {
-        if (id === root.previewNodeId) {
-            return { id: id, x: root.previewNodeX, y: root.previewNodeY }
-        }
+        // 仅从实际节点中查找，不再返回预览节点
         for (var i = 0; i < root.allNodes.length; i++) {
             if (root.allNodes[i].id === id) return root.allNodes[i]
         }

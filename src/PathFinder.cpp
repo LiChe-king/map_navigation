@@ -8,59 +8,70 @@ PathFinder::PathFinder(const CampusGraph* graph) : graph(graph) {}
 PathResult PathFinder::shortestPath(int fromId, int toId) const {
     PathResult result;
     if (!graph) return result;
-    
-    // 检查节点是否存在
-    if (!graph->hasNode(fromId) || !graph->hasNode(toId)) return result;
-    
-    const auto& adj = graph->getAdjacency();
+
     const auto& nodes = graph->getAllNodes();
-    int n = nodes.size();
-    
+    int n = static_cast<int>(nodes.size());
+
+    // 构建 ID -> 索引 映射
+    std::unordered_map<int, int> idToIdx;
+    for (int i = 0; i < n; ++i) {
+        idToIdx[nodes[i].id] = i;
+    }
+
+    auto itFrom = idToIdx.find(fromId);
+    auto itTo = idToIdx.find(toId);
+    if (itFrom == idToIdx.end() || itTo == idToIdx.end()) {
+        return result;   // 起点或终点不在图中
+    }
+
+    int startIdx = itFrom->second;
+    int targetIdx = itTo->second;
+
     const int INF = std::numeric_limits<int>::max() / 4;
     std::vector<int> dist(n, INF);
     std::vector<int> prev(n, -1);
     std::vector<bool> visited(n, false);
-    
-    int startIdx = -1, targetIdx = -1;
-    for (int i = 0; i < n; ++i) {
-        if (nodes[i].id == fromId) startIdx = i;
-        if (nodes[i].id == toId) targetIdx = i;
-    }
-    if (startIdx < 0 || targetIdx < 0) return result;
-    
+
     MinHeap heap;
     dist[startIdx] = 0;
     heap.push({startIdx, 0});
-    
+
+    const auto& adj = graph->getAdjacency(); // 邻接表，Edge.to 是节点 ID
+
     while (!heap.isEmpty()) {
         HeapNode node = heap.pop();
-        if (visited[node.vertex]) continue;
-        visited[node.vertex] = true;
-        if (node.vertex == targetIdx) break;
-        
-        for (const Edge& edge : adj[node.vertex]) {
-            if (visited[edge.to]) continue;
-            int candidate = dist[node.vertex] + edge.weight;
-            if (candidate < dist[edge.to]) {
-                dist[edge.to] = candidate;
-                prev[edge.to] = node.vertex;
-                heap.push({edge.to, candidate});
+        int uIdx = node.vertex;
+        if (visited[uIdx]) continue;
+        visited[uIdx] = true;
+        if (uIdx == targetIdx) break;
+
+        for (const Edge& edge : adj[uIdx]) {
+            int vId = edge.to;
+            auto itV = idToIdx.find(vId);
+            if (itV == idToIdx.end()) continue; // 安全起见
+            int vIdx = itV->second;
+            if (visited[vIdx]) continue;
+
+            int candidate = dist[uIdx] + edge.weight;
+            if (candidate < dist[vIdx]) {
+                dist[vIdx] = candidate;
+                prev[vIdx] = uIdx;
+                heap.push({vIdx, candidate});
             }
         }
     }
-    
-    if (dist[targetIdx] == INF) return result;
-    
+
+    if (dist[targetIdx] == INF) return result; // 不可达
+
     // 重建路径
     std::vector<int> indices;
     for (int at = targetIdx; at != -1; at = prev[at]) {
         indices.push_back(at);
     }
     std::reverse(indices.begin(), indices.end());
-    
+
     return buildPathFromNodeIndices(indices, dist[targetIdx]);
 }
-
 PathResult PathFinder::buildPathFromNodeIndices(const std::vector<int>& indices, int length) const {
     PathResult result;
     result.totalLength = length;

@@ -41,7 +41,6 @@ qt_add_qml_module(CampusGuide
         qml/SpotPickerRow.qml
         qml/MapEdgesLayer.qml
         qml/MapNodeLayer.qml
-        qml/TempEdgeLine.qml
         qml/SpotMarkersLayer.qml
         qml/SpotInfoPopup.qml
         qml/NavigationPopups.qml

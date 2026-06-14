@@ -14,7 +14,7 @@ DraggablePopup {
     signal mapPickRequested(string mode)
     signal closeRequested()
 
-    width: 440
+    width: 400
     height: 560
     titleText: "📍 附近设施"
 

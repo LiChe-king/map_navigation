@@ -25,7 +25,10 @@ bool CampusGraph::loadFromFiles(const std::string& spotsFile,
         }
     }
     
-    // 读景点
+    // 先加载路口节点（nodes.txt）
+    if (!roadNetwork.loadNodes(nodesFile)) return false;
+    
+    // 再读景点
     std::ifstream spotInput(spotsFile);
     if (!spotInput) return false;
     
@@ -44,10 +47,18 @@ bool CampusGraph::loadFromFiles(const std::string& spotsFile,
         spot.x = std::stod(parts[4]);
         spot.y = std::stod(parts[5]);
         spots.push_back(spot);
+        
+        // 将景点节点加入路网（若尚未存在）
+        if (!roadNetwork.hasNode(spot.id)) {
+            Node spotNode;
+            spotNode.id = spot.id;
+            spotNode.x = spot.x;
+            spotNode.y = spot.y;
+            roadNetwork.addNode(spotNode);
+        }
     }
     
-    // 读节点和边
-    if (!roadNetwork.loadNodes(nodesFile)) return false;
+    // 最后加载边（此时路网节点已包含所有景点和路口）
     if (!roadNetwork.loadEdges(edgesFile)) return false;
     
     return true;

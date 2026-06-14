@@ -298,19 +298,18 @@ QVariantMap CampusBackend::pathToMap(const PathResult& path) const
 {
     QVariantMap item;
     QVariantList ids;
-    QVariantList names;
+    QVariantList names;      // 仅景点名称
     QVariantList points;
     
     for (int nodeId : path.nodeIds) {
         ids.push_back(nodeId);
         
-        // 如果是景点，取名字
+        // 只有景点（id < 1000）才加入 names
         const Spot* spot = graph.getSpotById(nodeId);
         if (spot) {
             names.push_back(QString::fromStdString(spot->name));
-        } else {
-            names.push_back(QString("节点%1").arg(nodeId));
         }
+        // 路点不加入 names，保持路径文本简洁
     }
     
     for (const auto& p : path.drawPoints) {

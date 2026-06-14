@@ -115,7 +115,6 @@ ApplicationWindow {
         hasUnsavedChanges: window.hasUnsavedChanges
         selectedNode: window.selectedNode
         toolMode: window.editToolMode
-        z: 200
 
         onSaveRequested: editActions.saveChanges()
         onUndoRequested: {
