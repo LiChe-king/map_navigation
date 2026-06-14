@@ -23,6 +23,7 @@ qt_add_qml_module(CampusGuide
     QML_FILES
         qml/main.qml
         qml/MapPage.qml
+        qml/MapWorkspace.qml
         qml/PathDrawer.qml
         qml/MenuButton.qml
         qml/EditorPanel.qml
@@ -30,6 +31,16 @@ qt_add_qml_module(CampusGuide
         qml/PathPopup.qml
         qml/NearbyPopup.qml
         qml/QueryPopup.qml
+        qml/DraggablePopup.qml
+        qml/SpotPickerRow.qml
+        qml/MapEdgesLayer.qml
+        qml/MapNodeLayer.qml
+        qml/TempEdgeLine.qml
+        qml/SpotMarkersLayer.qml
+        qml/SpotInfoPopup.qml
+        qml/NavigationPopups.qml
+        qml/NearbyResultRow.qml
+        qml/SpotListRow.qml
     RESOURCES
         data/spots.txt
         data/nodes.txt
