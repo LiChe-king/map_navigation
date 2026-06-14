@@ -14,21 +14,20 @@ RowLayout {
     Layout.fillWidth: true
     spacing: 8
 
-    ComboBox {
+    AppComboBox {
         id: spotCombo
         Layout.fillWidth: true
         model: root.spotsModel
         textRole: "name"
         editable: true
-        background: Rectangle {
-            color: Qt.rgba(245, 247, 242, 0.8)
-            radius: 8
-            border.color: "#d2dacb"
-        }
     }
 
-    Button {
+    AppButton {
         text: "📍"
+        implicitWidth: 42
+        buttonColor: "#f8faf5"
+        buttonTextColor: "#2c3e2f"
+        borderColor: "#d2dacb"
         onClicked: root.mapPickRequested(root.pickMode)
         ToolTip.text: "从地图选点"
         ToolTip.visible: hovered

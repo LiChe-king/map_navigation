@@ -22,11 +22,17 @@ qt_add_qml_module(CampusGuide
     VERSION 1.0
     QML_FILES
         qml/main.qml
+        qml/AppButton.qml
+        qml/AppComboBox.qml
+        qml/AppTextArea.qml
+        qml/AppTextField.qml
         qml/MapPage.qml
         qml/MapWorkspace.qml
         qml/PathDrawer.qml
         qml/MenuButton.qml
         qml/EditorPanel.qml
+        qml/EditActions.qml
+        qml/SpotEditForm.qml
         qml/CustomMenuBar.qml
         qml/PathPopup.qml
         qml/NearbyPopup.qml

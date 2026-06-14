@@ -8,6 +8,9 @@ Item {
     property var spotsModel: []
     property bool editMode: false
     property int focusSpotId: -1
+    property int previewSpotId: -1
+    property real previewSpotX: 0
+    property real previewSpotY: 0
 
     signal spotClicked(var spot)
 
@@ -17,11 +20,13 @@ Item {
         delegate: Item {
             id: markerContainer
 
-            x: modelData.x - markerRect.width / 2
-            y: modelData.y - markerRect.height - 6
+            x: markerContainer.effectiveX - markerRect.width / 2
+            y: markerContainer.effectiveY - markerRect.height - 6
             opacity: root.editMode ? 0.6 : 1.0
 
             property int textWidth: markerText.implicitWidth + 32
+            property real effectiveX: modelData.id === root.previewSpotId ? root.previewSpotX : modelData.x
+            property real effectiveY: modelData.id === root.previewSpotId ? root.previewSpotY : modelData.y
 
             Rectangle {
                 id: markerRect

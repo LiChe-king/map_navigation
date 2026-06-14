@@ -6,12 +6,18 @@ Item {
     property var edges: []
     property var allNodes: []
     property bool editMode: false
+    property int previewNodeId: -1
+    property real previewNodeX: 0
+    property real previewNodeY: 0
 
     signal edgeRemoved(int fromId, int toId)
 
     onEdgesChanged: edgesCanvas.requestPaint()
     onAllNodesChanged: edgesCanvas.requestPaint()
     onEditModeChanged: edgesCanvas.requestPaint()
+    onPreviewNodeIdChanged: edgesCanvas.requestPaint()
+    onPreviewNodeXChanged: edgesCanvas.requestPaint()
+    onPreviewNodeYChanged: edgesCanvas.requestPaint()
 
     Canvas {
         id: edgesCanvas
@@ -64,6 +70,9 @@ Item {
     }
 
     function findNodeById(id) {
+        if (id === root.previewNodeId) {
+            return { id: id, x: root.previewNodeX, y: root.previewNodeY }
+        }
         for (var i = 0; i < root.allNodes.length; i++) {
             if (root.allNodes[i].id === id) return root.allNodes[i]
         }

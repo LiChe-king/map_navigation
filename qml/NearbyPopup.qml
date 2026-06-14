@@ -53,15 +53,10 @@ DraggablePopup {
                 font.bold: true
                 color: "#2c3e2f"
             }
-            ComboBox {
+            AppComboBox {
                 id: typeCombo
                 Layout.fillWidth: true
                 model: ["校门", "餐饮食堂", "公共教学楼", "学院专业楼", "体育场地", "宿舍", "图书馆", "诊所", "景点", "活动场地", "其他"]
-                background: Rectangle {
-                    color: Qt.rgba(245, 247, 242, 0.8)
-                    radius: 8
-                    border.color: "#d2dacb"
-                }
             }
 
             Button {

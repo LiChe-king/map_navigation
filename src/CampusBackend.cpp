@@ -119,6 +119,7 @@ bool CampusBackend::removeSpot(int id)
 {
     bool ok = graph.removeSpot(id);
     if (ok) {
+        graph.removeNode(id);
         save();
         emit dataChanged();
     }
@@ -344,6 +345,39 @@ bool CampusBackend::updateSpotOnly(int id, const QString& name, const QString& t
         node.x = x;
         node.y = y;
         graph.updateNode(node);
+        emit dataChanged();
+    }
+    return ok;
+}
+
+bool CampusBackend::addSpotOnly(int id, const QString& name, const QString& type,
+                                const QString& intro, double x, double y)
+{
+    Spot spot;
+    spot.id = id;
+    spot.name = name.toStdString();
+    spot.type = type.toStdString();
+    spot.intro = intro.toStdString();
+    spot.x = x;
+    spot.y = y;
+
+    bool ok = graph.addSpot(spot);
+    if (ok) {
+        Node node;
+        node.id = id;
+        node.x = x;
+        node.y = y;
+        graph.addNode(node);
+        emit dataChanged();
+    }
+    return ok;
+}
+
+bool CampusBackend::removeSpotOnly(int id)
+{
+    bool ok = graph.removeSpot(id);
+    if (ok) {
+        graph.removeNode(id);
         emit dataChanged();
     }
     return ok;

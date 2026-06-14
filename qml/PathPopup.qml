@@ -82,32 +82,27 @@ DraggablePopup {
                 radius: 12
                 border.color: Qt.rgba(224, 229, 216, 0.6)
 
-                TextArea {
+                AppTextArea {
                     id: pathResultText
                     anchors.fill: parent
                     anchors.margins: 12
                     readOnly: true
                     wrapMode: Text.WordWrap
                     placeholderText: "路径结果将显示在这里"
-                    background: null
                     font.pixelSize: 13
                 }
             }
 
-            Button {
+            AppButton {
                 text: "清除路径"
                 Layout.fillWidth: true
-                flat: true
+                buttonColor: "#eef3ea"
+                buttonTextColor: "#8f9b8a"
                 onClicked: {
                     startPicker.editText = ""
                     endPicker.editText = ""
                     pathResultText.text = ""
                     root.pathCalculated({})
-                }
-                contentItem: Text {
-                    text: parent.text
-                    color: "#8f9b8a"
-                    horizontalAlignment: Text.AlignHCenter
                 }
             }
         }

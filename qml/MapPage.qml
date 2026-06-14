@@ -5,20 +5,29 @@ Item {
     id: root
 
     property var spotsModel: []
+    property var markerSpotsModel: spotsModel
     property var pathResult: ({})
     property int focusSpotId: -1
     property int tempEdgeFrom: -1
     property var popupSpot: ({})
     property bool editMode: false
+    property string editTool: "select"
     property var allNodes: []
     property var edges: []
     property real mapLayerScale: mapLayer.scale
+    property real lastMouseX: width / 2
+    property real lastMouseY: height / 2
+    property int previewNodeId: -1
+    property real previewNodeX: 0
+    property real previewNodeY: 0
 
     signal nodeMoved(int nodeId, double newX, double newY)
+    signal nodePreviewMoved(int nodeId, double newX, double newY)
     signal edgeAdded(int fromId, int toId)
     signal edgeRemoved(int fromId, int toId)
     signal nodeSelected(int nodeId)
     signal tempEdgeChanged(var fromId)
+    signal mapClicked(double mapX, double mapY)
 
     focus: true
     Keys.onPressed: function(event) {
@@ -33,10 +42,22 @@ Item {
             root.tempEdgeChanged(-1)
         }
     }
+    onSpotsModelChanged: markerSpotsModel = spotsModel
 
     Rectangle {
         anchors.fill: parent
         color: "#e8efe4"
+    }
+
+    MouseArea {
+        anchors.fill: parent
+        hoverEnabled: true
+        acceptedButtons: Qt.NoButton
+        z: 50
+        onPositionChanged: function(mouse) {
+            root.lastMouseX = mouse.x
+            root.lastMouseY = mouse.y
+        }
     }
 
     Flickable {
@@ -67,11 +88,24 @@ Item {
                 pathPoints: root.pathResult.points || []
             }
 
+            MouseArea {
+                anchors.fill: parent
+                enabled: root.editMode && (root.editTool === "drawRoad" || root.editTool === "addSpot")
+                cursorShape: root.editTool === "addSpot" ? Qt.CrossCursor : Qt.PointingHandCursor
+                z: 2
+                onClicked: function(mouse) {
+                    root.mapClicked(mouse.x, mouse.y)
+                }
+            }
+
             MapEdgesLayer {
                 anchors.fill: parent
-                editMode: root.editMode
+                editMode: root.editMode && root.editTool === "select"
                 edges: root.edges
                 allNodes: root.allNodes
+                previewNodeId: root.previewNodeId
+                previewNodeX: root.previewNodeX
+                previewNodeY: root.previewNodeY
                 onEdgeRemoved: function(fromId, toId) {
                     root.edgeRemoved(fromId, toId)
                 }
@@ -79,6 +113,7 @@ Item {
 
             MapNodeLayer {
                 anchors.fill: parent
+                z: 10
                 editMode: root.editMode
                 allNodes: root.allNodes
                 focusSpotId: root.focusSpotId
@@ -87,6 +122,13 @@ Item {
                 mapHeight: mapLayer.height
                 onNodeMoved: function(nodeId, newX, newY) {
                     root.nodeMoved(nodeId, newX, newY)
+                    root.clearNodePreview()
+                }
+                onNodePreviewMoved: function(nodeId, newX, newY) {
+                    root.previewNodeId = nodeId
+                    root.previewNodeX = newX
+                    root.previewNodeY = newY
+                    root.nodePreviewMoved(nodeId, newX, newY)
                 }
                 onEdgeAdded: function(fromId, toId) {
                     root.edgeAdded(fromId, toId)
@@ -110,9 +152,12 @@ Item {
             SpotMarkersLayer {
                 anchors.fill: parent
                 z: 1
-                spotsModel: root.spotsModel
+                spotsModel: root.markerSpotsModel
                 editMode: root.editMode
                 focusSpotId: root.focusSpotId
+                previewSpotId: root.previewNodeId < 1000 ? root.previewNodeId : -1
+                previewSpotX: root.previewNodeX
+                previewSpotY: root.previewNodeY
                 onSpotClicked: function(spot) {
                     root.popupSpot = spot
                     root.focusSpotId = spot.id
@@ -121,10 +166,22 @@ Item {
         }
 
         WheelHandler {
-            target: mapLayer
+            id: wheelHandler
+            target: null
             onWheel: function(event) {
-                var next = mapLayer.scale + event.angleDelta.y / 1200
-                mapLayer.scale = Math.max(0.35, Math.min(1.8, next))
+                var oldScale = mapLayer.scale
+                var nextScale = Math.max(0.35, Math.min(1.8, oldScale + event.angleDelta.y / 1200))
+                if (nextScale === oldScale) return
+
+                var anchorX = root.lastMouseX
+                var anchorY = root.lastMouseY
+                var anchorMapX = (flickable.contentX + anchorX) / oldScale
+                var anchorMapY = (flickable.contentY + anchorY) / oldScale
+                mapLayer.scale = nextScale
+
+                flickable.contentX = clamp(anchorMapX * nextScale - anchorX, 0, Math.max(0, mapLayer.width * nextScale - flickable.width))
+                flickable.contentY = clamp(anchorMapY * nextScale - anchorY, 0, Math.max(0, mapLayer.height * nextScale - flickable.height))
+                event.accepted = true
             }
         }
     }
@@ -144,5 +201,20 @@ Item {
         targetY = Math.max(0, Math.min(targetY, flickable.contentHeight - flickable.height))
         flickable.contentX = targetX
         flickable.contentY = targetY
+    }
+
+    function viewportToMap(viewX, viewY) {
+        return {
+            x: (flickable.contentX + viewX) / mapLayer.scale,
+            y: (flickable.contentY + viewY) / mapLayer.scale
+        }
+    }
+
+    function clamp(value, minValue, maxValue) {
+        return Math.max(minValue, Math.min(value, maxValue))
+    }
+
+    function clearNodePreview() {
+        root.previewNodeId = -1
     }
 }

@@ -8,17 +8,21 @@ Item {
     property int focusSpotId: -1
     property var popupSpot: ({})
     property bool editMode: false
+    property string editTool: "select"
     property int tempEdgeFrom: -1
     property string pickingMode: ""
     property string originalMenu: ""
     property real mapLayerScale: mapPage.mapLayerScale
 
     signal nodeMoved(int nodeId, double newX, double newY)
+    signal nodePreviewMoved(int nodeId, double newX, double newY)
     signal edgeAdded(int fromId, int toId)
     signal edgeRemoved(int fromId, int toId)
     signal nodeSelected(var node)
     signal tempEdgeChanged(var fromId)
     signal spotPicked(string mode, string spotName, string originalMenu)
+    signal mapPickCanceled(string originalMenu)
+    signal editMapClicked(double mapX, double mapY)
 
     MapPage {
         id: mapPage
@@ -28,12 +32,16 @@ Item {
         focusSpotId: root.focusSpotId
         popupSpot: root.popupSpot
         editMode: root.editMode
+        editTool: root.editTool
         allNodes: root.getAllNodesData()
         edges: root.getAllEdgesData()
         tempEdgeFrom: root.tempEdgeFrom
 
         onNodeMoved: function(nodeId, newX, newY) {
             root.nodeMoved(nodeId, newX, newY)
+        }
+        onNodePreviewMoved: function(nodeId, newX, newY) {
+            root.nodePreviewMoved(nodeId, newX, newY)
         }
         onEdgeAdded: function(fromId, toId) {
             root.edgeAdded(fromId, toId)
@@ -47,21 +55,38 @@ Item {
         onTempEdgeChanged: function(fromId) {
             root.tempEdgeChanged(fromId)
         }
+        onMapClicked: function(mapX, mapY) {
+            root.editMapClicked(mapX, mapY)
+        }
     }
 
     MouseArea {
+        id: mapPickArea
         anchors.fill: parent
         enabled: !root.editMode && root.pickingMode !== ""
         cursorShape: Qt.CrossCursor
         z: 100
 
-        onClicked: function(mouse) {
-            if (!root.backend) return
+        onEnabledChanged: {
+            if (!enabled) {
+                cursorShape = Qt.ArrowCursor
+            } else {
+                cursorShape = Qt.CrossCursor
+            }
+        }
 
-            var scenePos = mapPage.mapToItem(mapPage, mouse.x, mouse.y)
+        onClicked: function(mouse) {
+            if (!root.backend) {
+                root.mapPickCanceled(root.originalMenu)
+                return
+            }
+
+            var scenePos = mapPage.viewportToMap(mouse.x, mouse.y)
             var nearest = root.findNearestSpot(scenePos.x, scenePos.y)
             if (nearest.id !== -1) {
                 root.spotPicked(root.pickingMode, nearest.name, root.originalMenu)
+            } else {
+                root.mapPickCanceled(root.originalMenu)
             }
         }
     }

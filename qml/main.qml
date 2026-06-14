@@ -16,9 +16,19 @@ ApplicationWindow {
     property int currentFocusSpotId: -1
     property var currentPopupSpot: ({})
     property bool editMode: false
+    property string editToolMode: "select"
     property var selectedNode: null
     property int tempEdgeFrom: -1
+    property int roadTailId: -1
     property bool hasUnsavedChanges: false
+
+    EditActions {
+        id: editActions
+        app: window
+        backend: campusBackend
+        workspace: mapWorkspace
+        editorPanel: editorPanel
+    }
 
     MapWorkspace {
         id: mapWorkspace
@@ -28,20 +38,13 @@ ApplicationWindow {
         focusSpotId: window.currentFocusSpotId
         popupSpot: window.currentPopupSpot
         editMode: window.editMode
+        editTool: window.editToolMode
         tempEdgeFrom: window.tempEdgeFrom
         pickingMode: window.pickingMode
         originalMenu: window.originalMenu
 
         onNodeMoved: function(nodeId, newX, newY) {
-            if (nodeId < 1000) {
-                var spot = campusBackend.spotDetail(nodeId)
-                if (spot.id) {
-                    campusBackend.updateSpotOnly(nodeId, spot.name, spot.type, spot.intro, newX, newY)
-                }
-            } else {
-                campusBackend.updateNodeOnly(nodeId, newX, newY)
-            }
-            window.hasUnsavedChanges = true
+            editActions.moveNode(nodeId, newX, newY)
         }
         onEdgeAdded: function(fromId, toId) {
             campusBackend.addEdgeOnly(fromId, toId)
@@ -55,6 +58,9 @@ ApplicationWindow {
         }
         onNodeSelected: function(node) {
             window.selectedNode = node
+            if (window.editToolMode === "drawRoad" && node) {
+                editActions.continueRoadAtNode(node.id)
+            }
         }
         onTempEdgeChanged: function(fromId) {
             window.tempEdgeFrom = (fromId !== undefined && fromId !== -1) ? fromId : -1
@@ -64,6 +70,18 @@ ApplicationWindow {
             window.pickingMode = ""
             navigationPopups.reopen(menuName)
             window.originalMenu = ""
+        }
+        onMapPickCanceled: function(menuName) {
+            window.pickingMode = ""
+            navigationPopups.reopen(menuName)
+            window.originalMenu = ""
+        }
+        onEditMapClicked: function(mapX, mapY) {
+            if (window.editToolMode === "drawRoad") {
+                editActions.addRoadNodeAt(mapX, mapY)
+            } else if (window.editToolMode === "addSpot") {
+                editActions.addSpotAt(mapX, mapY)
+            }
         }
     }
 
@@ -91,32 +109,42 @@ ApplicationWindow {
 
     EditorPanel {
         id: editorPanel
-        anchors.right: parent.right
-        anchors.top: parent.top
-        anchors.margins: 20
+        x: window.width - width - 20
+        y: 20
         editMode: window.editMode
         hasUnsavedChanges: window.hasUnsavedChanges
         selectedNode: window.selectedNode
-        mapLayerScale: mapWorkspace.mapLayerScale
+        toolMode: window.editToolMode
         z: 200
 
-        onSaveRequested: window.saveChanges()
+        onSaveRequested: editActions.saveChanges()
         onUndoRequested: {
             campusBackend.load()
             window.hasUnsavedChanges = false
             mapWorkspace.refreshGraph()
         }
         onRefreshRequested: mapWorkspace.refreshGraph()
+        onToolModeRequested: function(mode) {
+            window.editToolMode = mode
+            window.tempEdgeFrom = -1
+            if (mode !== "drawRoad") {
+                window.roadTailId = -1
+            }
+        }
         onUpdateSpotName: function(nodeId, newName) {
-            window.updateSpotName(nodeId, newName)
+            editActions.updateSpotName(nodeId, newName)
         }
-        onDeleteNodeRequested: function(nodeId) {
-            campusBackend.removeNodeOnly(nodeId)
-            window.selectedNode = null
-            mapWorkspace.refreshGraph()
-            window.hasUnsavedChanges = true
+        onUpdateSpotInfo: function(nodeId, newName, newType, newIntro) {
+            editActions.updateSpotInfo(nodeId, newName, newType, newIntro)
         }
-        onAddNodeRequested: window.addRoadNode()
+        onDeleteSelectedRequested: function(nodeId) {
+            editActions.deleteSelectedNode(nodeId)
+        }
+        onAddNodeRequested: editActions.addRoadNode()
+        onRoadDrawResetRequested: {
+            window.roadTailId = -1
+            window.tempEdgeFrom = -1
+        }
     }
 
     NavigationPopups {
@@ -146,41 +174,12 @@ ApplicationWindow {
             window.editMode = false
             window.selectedNode = null
             window.tempEdgeFrom = -1
-            if (window.hasUnsavedChanges) saveChanges()
+            window.roadTailId = -1
+            if (window.hasUnsavedChanges) editActions.saveChanges()
         } else {
             navigationPopups.closeAll()
             window.editMode = true
         }
-    }
-
-    function saveChanges() {
-        campusBackend.save()
-        window.hasUnsavedChanges = false
-    }
-
-    function updateSpotName(nodeId, newName) {
-        var spot = campusBackend.spotDetail(nodeId)
-        if (!spot.id) return
-
-        campusBackend.updateSpotOnly(nodeId, newName, spot.type, spot.intro, spot.x, spot.y)
-        if (window.selectedNode) window.selectedNode.name = newName
-        mapWorkspace.refreshGraph()
-        window.hasUnsavedChanges = true
-    }
-
-    function addRoadNode() {
-        var maxId = 1000
-        var nodes = campusBackend.nodes
-        for (var i = 0; i < nodes.length; i++) {
-            if (nodes[i].id > maxId) maxId = nodes[i].id
-        }
-
-        var newNodeId = Math.max(maxId + 1, 1000)
-        var centerX = mapWorkspace.width / 2 / (mapWorkspace.mapLayerScale || 1)
-        var centerY = mapWorkspace.height / 2 / (mapWorkspace.mapLayerScale || 1)
-        campusBackend.addNodeOnly(newNodeId, centerX, centerY)
-        mapWorkspace.refreshGraph()
-        window.hasUnsavedChanges = true
     }
 
     function getSpotIdByName(name) {

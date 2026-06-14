@@ -47,6 +47,9 @@ public:
     // 只更新内存，不保存文件
     Q_INVOKABLE bool updateSpotOnly(int id, const QString& name, const QString& type,
                                     const QString& intro, double x, double y);
+    Q_INVOKABLE bool addSpotOnly(int id, const QString& name, const QString& type,
+                                 const QString& intro, double x, double y);
+    Q_INVOKABLE bool removeSpotOnly(int id);
     Q_INVOKABLE bool updateNodeOnly(int id, double x, double y);
     Q_INVOKABLE bool addNodeOnly(int id, double x, double y);
     Q_INVOKABLE bool removeNodeOnly(int id);

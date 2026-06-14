@@ -12,6 +12,7 @@ Item {
     property real mapHeight: height
 
     signal nodeMoved(int nodeId, double newX, double newY)
+    signal nodePreviewMoved(int nodeId, double newX, double newY)
     signal edgeAdded(int fromId, int toId)
     signal nodeSelected(int nodeId)
     signal tempEdgeChanged(var fromId)
@@ -52,6 +53,7 @@ Item {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.DragMoveCursor
+                preventStealing: true
                 drag.target: parent
                 drag.axis: Drag.XAndYAxis
                 drag.minimumX: 0
@@ -63,6 +65,12 @@ Item {
                 onReleased: {
                     if (root.editMode && modelData) {
                         root.nodeMoved(modelData.id, parent.x + 16, parent.y + 16)
+                    }
+                }
+
+                onPositionChanged: {
+                    if (drag.active && root.editMode && modelData) {
+                        root.nodePreviewMoved(modelData.id, parent.x + 16, parent.y + 16)
                     }
                 }
 
