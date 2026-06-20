@@ -9,13 +9,16 @@ Item {
     property int previewNodeId: -1
     property real previewNodeX: 0
     property real previewNodeY: 0
+    property var nodeById: ({})
 
     signal edgeRemoved(int fromId, int toId)
 
     onEdgesChanged: edgesCanvas.requestPaint()
-    onAllNodesChanged: edgesCanvas.requestPaint()
+    onAllNodesChanged: {
+        rebuildNodeIndex()
+        edgesCanvas.requestPaint()
+    }
     onEditModeChanged: edgesCanvas.requestPaint()
-    // 移除 onPreviewNodeIdChanged 等绑定，避免拖拽时频繁重绘
 
     Canvas {
         id: edgesCanvas
@@ -27,6 +30,8 @@ Item {
 
             if (!root.editMode || !root.edges || root.edges.length === 0) return
 
+            ctx.lineWidth = 3
+            ctx.strokeStyle = "#3498db"
             for (var i = 0; i < root.edges.length; i++) {
                 var edge = root.edges[i]
                 var fromNode = root.findNodeById(edge.from)
@@ -37,8 +42,6 @@ Item {
                 ctx.beginPath()
                 ctx.moveTo(fromNode.x, fromNode.y)
                 ctx.lineTo(toNode.x, toNode.y)
-                ctx.lineWidth = 3
-                ctx.strokeStyle = "#3498db"
                 ctx.stroke()
             }
         }
@@ -68,11 +71,21 @@ Item {
     }
 
     function findNodeById(id) {
-        // 仅从实际节点中查找，不再返回预览节点
-        for (var i = 0; i < root.allNodes.length; i++) {
-            if (root.allNodes[i].id === id) return root.allNodes[i]
+        return root.nodeById[id] || null
+    }
+
+    function rebuildNodeIndex() {
+        var next = {}
+        if (!root.allNodes) {
+            root.nodeById = next
+            return
         }
-        return null
+
+        for (var i = 0; i < root.allNodes.length; i++) {
+            var node = root.allNodes[i]
+            next[node.id] = node
+        }
+        root.nodeById = next
     }
 
     function findHoveredEdge(mouseX, mouseY) {

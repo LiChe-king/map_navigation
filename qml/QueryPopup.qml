@@ -9,7 +9,7 @@ DraggablePopup {
 
     signal spotSelected(var spot)
 
-    width: 400
+    width: 380
     height: 480
     titleText: "🔎 景点查询"
 

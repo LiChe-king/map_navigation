@@ -13,6 +13,7 @@ Item {
     property string pickingMode: ""
     property string originalMenu: ""
     property real mapLayerScale: mapPage.mapLayerScale
+    property var nodeById: ({})
 
     signal nodeMoved(int nodeId, double newX, double newY)
     signal nodePreviewMoved(int nodeId, double newX, double newY)
@@ -37,6 +38,7 @@ Item {
         edges: root.getAllEdgesData()
         tempEdgeFrom: root.tempEdgeFrom
 
+        onAllNodesChanged: root.rebuildNodeIndex(allNodes)
         onNodeMoved: function(nodeId, newX, newY) {
             root.nodeMoved(nodeId, newX, newY)
         }
@@ -68,11 +70,7 @@ Item {
         z: 100
 
         onEnabledChanged: {
-            if (!enabled) {
-                cursorShape = Qt.ArrowCursor
-            } else {
-                cursorShape = Qt.CrossCursor
-            }
+            cursorShape = enabled ? Qt.CrossCursor : Qt.ArrowCursor
         }
 
         onClicked: function(mouse) {
@@ -94,6 +92,7 @@ Item {
     function refreshGraph() {
         mapPage.allNodes = getAllNodesData()
         mapPage.edges = getAllEdgesData()
+        rebuildNodeIndex(mapPage.allNodes)
     }
 
     function jumpToSpot(spotX, spotY) {
@@ -101,16 +100,7 @@ Item {
     }
 
     function getAllNodesData() {
-        var nodes = []
-        if (!root.backend) return nodes
-
-        for (var i = 0; i < root.backend.spots.length; i++) {
-            nodes.push(JSON.parse(JSON.stringify(root.backend.spots[i])))
-        }
-        for (var j = 0; j < root.backend.nodes.length; j++) {
-            nodes.push(JSON.parse(JSON.stringify(root.backend.nodes[j])))
-        }
-        return root.backend ? root.backend.nodes : []
+        return root.backend ? (root.backend.nodes || []) : []
     }
 
     function getAllEdgesData() {
@@ -118,26 +108,32 @@ Item {
     }
 
     function findNodeById(id) {
-        var nodes = getAllNodesData()
-        for (var i = 0; i < nodes.length; i++) {
-            if (nodes[i].id === id) {
-                var node = nodes[i]
-                // 如果是景点，从 spots 中补充完整信息
-                if (id < 1000 && root.backend) {
-                    var spots = root.backend.spots
-                    for (var j = 0; j < spots.length; j++) {
-                        if (spots[j].id === id) {
-                            node.name = spots[j].name
-                            node.type = spots[j].type
-                            node.intro = spots[j].intro
-                            break
-                        }
-                    }
-                }
-                return node
+        var node = root.nodeById[id] || null
+        if (!node && mapPage.allNodes) {
+            rebuildNodeIndex(mapPage.allNodes)
+            node = root.nodeById[id] || null
+        }
+
+        if (node && id < 1000 && root.backend) {
+            var spot = root.backend.spotDetail(id)
+            if (spot && spot.id) {
+                node.name = spot.name
+                node.type = spot.type
+                node.intro = spot.intro
             }
         }
-        return null
+        return node
+    }
+
+    function rebuildNodeIndex(nodes) {
+        var next = {}
+        if (nodes) {
+            for (var i = 0; i < nodes.length; i++) {
+                var node = nodes[i]
+                next[node.id] = node
+            }
+        }
+        root.nodeById = next
     }
 
     function findNearestSpot(x, y) {

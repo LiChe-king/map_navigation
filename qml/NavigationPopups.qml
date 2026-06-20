@@ -63,6 +63,15 @@ Item {
         onPathCalculated: function(result) {
             root.pathCalculated(result)
         }
+        onPathSelected: function(startName, endName, result) {
+            nearbyPopup.close()
+            pathPopup.showPath(startName, endName, result)
+            pathPopup.open()
+            root.activeMenu = "path"
+        }
+        onSpotSelected: function(spot) {
+            root.spotSelected(spot)
+        }
         onClosed: {
             if (root.activeMenu === "nearby") root.activeMenu = ""
         }

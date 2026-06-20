@@ -24,18 +24,19 @@ Item {
             y: markerContainer.effectiveY - markerRect.height - 6
             opacity: root.editMode ? 0.6 : 1.0
 
-            property int textWidth: markerText.implicitWidth + 32
+            property bool isSchoolGate: modelData.type === "校门" || modelData.type === "鏍￠棬"
+            property int textWidth: markerText.implicitWidth + (markerContainer.isSchoolGate ? 44 : 32)
             property real effectiveX: modelData.id === root.previewSpotId ? root.previewSpotX : modelData.x
             property real effectiveY: modelData.id === root.previewSpotId ? root.previewSpotY : modelData.y
 
             Rectangle {
                 id: markerRect
-                width: markerContainer.textWidth - 10
-                height: 40
-                radius: 15
+                width: markerContainer.isSchoolGate ? markerContainer.textWidth + 10 : markerContainer.textWidth - 10
+                height: markerContainer.isSchoolGate ? 70 : 40
+                radius: markerContainer.isSchoolGate ? 30 : 15
                 color: "#ffffff"
                 border.color: modelData.id === root.focusSpotId ? "#ffcf33" : "#d0d5cc"
-                border.width: 1.5
+                border.width: markerContainer.isSchoolGate ? 2 : 1.5
 
                 layer.enabled: true
                 layer.effect: DropShadow {
@@ -50,7 +51,8 @@ Item {
                     id: markerText
                     anchors.centerIn: parent
                     text: modelData.name
-                    font.pixelSize: 30
+                    font.pixelSize: markerContainer.isSchoolGate ? 50 : 30
+                    font.letterSpacing: markerContainer.isSchoolGate ? 5 : 2
                     font.family: "字魂扁桃体"
                     color: root.textColor(modelData.type)
                     elide: Text.ElideRight

@@ -8,9 +8,9 @@
 
 class CampusBackend : public QObject {
     Q_OBJECT
-    Q_PROPERTY(QVariantList spots READ spots NOTIFY dataChanged)
-    Q_PROPERTY(QVariantList nodes READ nodes NOTIFY dataChanged)
-    Q_PROPERTY(QVariantList edges READ edges NOTIFY dataChanged)
+    Q_PROPERTY(QVariantList spots READ spots NOTIFY spotsChanged)
+    Q_PROPERTY(QVariantList nodes READ nodes NOTIFY nodesChanged)
+    Q_PROPERTY(QVariantList edges READ edges NOTIFY edgesChanged)
 
 public:
     explicit CampusBackend(QObject* parent = nullptr);
@@ -58,6 +58,9 @@ public:
     
 signals:
     void dataChanged();
+    void spotsChanged();
+    void nodesChanged();
+    void edgesChanged();
     
 private:
     CampusGraph graph;

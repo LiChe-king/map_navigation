@@ -22,6 +22,9 @@ bool CampusBackend::load()
     );
     
     if (ok) {
+        emit spotsChanged();
+        emit nodesChanged();
+        emit edgesChanged();
         emit dataChanged();
         qDebug() << "Load success: spots =" << graph.getAllSpots().size()
                  << "nodes =" << graph.getAllNodes().size();
@@ -85,6 +88,8 @@ bool CampusBackend::addSpot(int id, const QString& name, const QString& type,
         node.y = y;
         graph.addNode(node);
         save();
+        emit spotsChanged();
+        emit nodesChanged();
         emit dataChanged();
     }
     return ok;
@@ -110,6 +115,8 @@ bool CampusBackend::updateSpot(int id, const QString& name, const QString& type,
         node.y = y;
         graph.updateNode(node);
         save();
+        emit spotsChanged();
+        emit nodesChanged();
         emit dataChanged();
     }
     return ok;
@@ -121,6 +128,9 @@ bool CampusBackend::removeSpot(int id)
     if (ok) {
         graph.removeNode(id);
         save();
+        emit spotsChanged();
+        emit nodesChanged();
+        emit edgesChanged();
         emit dataChanged();
     }
     return ok;
@@ -147,6 +157,7 @@ bool CampusBackend::addNode(int id, double x, double y)
     bool ok = graph.addNode(node);
     if (ok) {
         save();
+        emit nodesChanged();
         emit dataChanged();
     }
     return ok;
@@ -161,6 +172,7 @@ bool CampusBackend::updateNode(int id, double x, double y)
     bool ok = graph.updateNode(node);
     if (ok) {
         save();
+        emit nodesChanged();
         emit dataChanged();
     }
     return ok;
@@ -171,6 +183,8 @@ bool CampusBackend::removeNode(int id)
     bool ok = graph.removeNode(id);
     if (ok) {
         save();
+        emit nodesChanged();
+        emit edgesChanged();
         emit dataChanged();
     }
     return ok;
@@ -185,11 +199,6 @@ QVariantList CampusBackend::edges() const
     const auto& nodes = graph.getAllNodes();
     
     // 构建节点ID到索引的映射
-    QMap<int, int> idToIdx;
-    for (int i = 0; i < nodes.size(); ++i) {
-        idToIdx[nodes[i].id] = i;
-    }
-    
     // 遍历邻接表，收集所有边（只存一次，from < to）
     for (int i = 0; i < nodes.size(); ++i) {
         int fromId = nodes[i].id;
@@ -211,6 +220,7 @@ bool CampusBackend::addEdge(int from, int to)
     bool ok = graph.addEdge(from, to);
     if (ok) {
         save();
+        emit edgesChanged();
         emit dataChanged();
     }
     return ok;
@@ -221,6 +231,7 @@ bool CampusBackend::removeEdge(int from, int to)
     bool ok = graph.removeEdge(from, to);
     if (ok) {
         save();
+        emit edgesChanged();
         emit dataChanged();
     }
     return ok;
@@ -344,6 +355,8 @@ bool CampusBackend::updateSpotOnly(int id, const QString& name, const QString& t
         node.x = x;
         node.y = y;
         graph.updateNode(node);
+        emit spotsChanged();
+        emit nodesChanged();
         emit dataChanged();
     }
     return ok;
@@ -367,6 +380,8 @@ bool CampusBackend::addSpotOnly(int id, const QString& name, const QString& type
         node.x = x;
         node.y = y;
         graph.addNode(node);
+        emit spotsChanged();
+        emit nodesChanged();
         emit dataChanged();
     }
     return ok;
@@ -377,6 +392,9 @@ bool CampusBackend::removeSpotOnly(int id)
     bool ok = graph.removeSpot(id);
     if (ok) {
         graph.removeNode(id);
+        emit spotsChanged();
+        emit nodesChanged();
+        emit edgesChanged();
         emit dataChanged();
     }
     return ok;
@@ -390,6 +408,7 @@ bool CampusBackend::updateNodeOnly(int id, double x, double y)
     node.y = y;
     bool ok = graph.updateNode(node);
     if (ok) {
+        emit nodesChanged();
         emit dataChanged();
     }
     return ok;
@@ -403,6 +422,7 @@ bool CampusBackend::addNodeOnly(int id, double x, double y)
     node.y = y;
     bool ok = graph.addNode(node);
     if (ok) {
+        emit nodesChanged();
         emit dataChanged();
     }
     return ok;
@@ -412,6 +432,8 @@ bool CampusBackend::removeNodeOnly(int id)
 {
     bool ok = graph.removeNode(id);
     if (ok) {
+        emit nodesChanged();
+        emit edgesChanged();
         emit dataChanged();
     }
     return ok;
@@ -421,6 +443,7 @@ bool CampusBackend::addEdgeOnly(int from, int to)
 {
     bool ok = graph.addEdge(from, to);
     if (ok) {
+        emit edgesChanged();
         emit dataChanged();
     }
     return ok;
@@ -430,6 +453,7 @@ bool CampusBackend::removeEdgeOnly(int from, int to)
 {
     bool ok = graph.removeEdge(from, to);
     if (ok) {
+        emit edgesChanged();
         emit dataChanged();
     }
     return ok;

@@ -9,14 +9,15 @@ DraggablePopup {
     property var backend: null
     property var getSpotIdByNameFn: null
     property bool editMode: false
+    readonly property int formMargin: 12
 
     signal pathCalculated(var result)
     signal mapPickRequested(string mode)
     signal closeRequested()
 
-    width: 400
+    width: 380
     height: 540
-    titleText: "🧭 最短路径"
+    titleText: "最短路径"
 
     onClosed: {
         if (!editMode) {
@@ -25,22 +26,29 @@ DraggablePopup {
     }
 
     ScrollView {
+        id: pathScroll
         Layout.fillWidth: true
         Layout.fillHeight: true
+        contentWidth: availableWidth
         clip: true
-        padding: 20
+        padding: 8
 
         ColumnLayout {
-            width: parent.width
+            width: pathScroll.availableWidth
             spacing: 16
 
             Label {
-                text: "🚩 起点"
+                Layout.leftMargin: root.formMargin
+                Layout.rightMargin: root.formMargin
+                text: "起点"
                 font.bold: true
                 color: "#2c3e2f"
             }
+
             SpotPickerRow {
                 id: startPicker
+                Layout.leftMargin: root.formMargin
+                Layout.rightMargin: root.formMargin
                 spotsModel: root.spotsModel
                 pickMode: "start"
                 onMapPickRequested: function(mode) {
@@ -49,12 +57,17 @@ DraggablePopup {
             }
 
             Label {
-                text: "🏁 终点"
+                Layout.leftMargin: root.formMargin
+                Layout.rightMargin: root.formMargin
+                text: "终点"
                 font.bold: true
                 color: "#2c3e2f"
             }
+
             SpotPickerRow {
                 id: endPicker
+                Layout.leftMargin: root.formMargin
+                Layout.rightMargin: root.formMargin
                 spotsModel: root.spotsModel
                 pickMode: "end"
                 onMapPickRequested: function(mode) {
@@ -65,6 +78,8 @@ DraggablePopup {
             Button {
                 text: "查询路径"
                 Layout.fillWidth: true
+                Layout.leftMargin: root.formMargin
+                Layout.rightMargin: root.formMargin
                 background: Rectangle { radius: 20; color: "#de4d3f" }
                 contentItem: Text {
                     text: parent.text
@@ -77,6 +92,8 @@ DraggablePopup {
 
             Rectangle {
                 Layout.fillWidth: true
+                Layout.leftMargin: root.formMargin
+                Layout.rightMargin: root.formMargin
                 height: 140
                 color: Qt.rgba(245, 247, 242, 0.7)
                 radius: 12
@@ -96,11 +113,11 @@ DraggablePopup {
             AppButton {
                 text: "清除路径"
                 Layout.fillWidth: true
+                Layout.leftMargin: root.formMargin
+                Layout.rightMargin: root.formMargin
                 buttonColor: "#eef3ea"
                 buttonTextColor: "#8f9b8a"
                 onClicked: {
-                    startPicker.editText = ""
-                    endPicker.editText = ""
                     pathResultText.text = ""
                     root.pathCalculated({})
                 }
@@ -116,6 +133,13 @@ DraggablePopup {
         }
     }
 
+    function showPath(startName, endName, result) {
+        startPicker.editText = startName
+        endPicker.editText = endName
+        pathResultText.text = formatPathResult(result)
+        root.pathCalculated(result)
+    }
+
     function calculatePath() {
         if (!root.backend || !root.getSpotIdByNameFn) {
             pathResultText.text = "后端未就绪"
@@ -125,11 +149,16 @@ DraggablePopup {
         var startId = root.getSpotIdByNameFn(startPicker.editText)
         var endId = root.getSpotIdByNameFn(endPicker.editText)
         var result = root.backend.findShortestPath(startId, endId)
+        pathResultText.text = formatPathResult(result)
         root.pathCalculated(result)
+    }
+
+    function formatPathResult(result) {
+        if (!result) return ""
 
         var distance = result.length || result.totalLength || 0
         var names = result.names || []
-        pathResultText.text = names.length > 0
+        return names.length > 0
             ? names.join(" → ") + "\n\n总距离：" + distance + " 米"
             : "未找到可达路径"
     }

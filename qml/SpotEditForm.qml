@@ -24,7 +24,7 @@ ColumnLayout {
         id: spotTypeEditor
         Layout.fillWidth: true
         editable: true
-        model: ["校门", "餐饮食堂", "公共教学楼", "学院专业楼", "体育场地", "宿舍", "图书馆", "诊所", "景点", "活动场地", "其他"]
+        model: ["校门", "餐饮食堂", "公共教学楼", "学院专业楼", "校车乘车点", "体育场地", "宿舍", "图书馆", "诊所", "景点", "活动场地", "其他"]
         Component.onCompleted: root.syncSelectedSpot()
     }
 

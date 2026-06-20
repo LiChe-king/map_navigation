@@ -9,14 +9,17 @@ DraggablePopup {
     property var backend: null
     property var getSpotIdByNameFn: null
     property bool editMode: false
+    readonly property int formMargin: 12
 
     signal pathCalculated(var result)
+    signal pathSelected(string startName, string endName, var result)
+    signal spotSelected(var spot)
     signal mapPickRequested(string mode)
     signal closeRequested()
 
-    width: 400
+    width: 380
     height: 560
-    titleText: "📍 附近设施"
+    titleText: "附近设施"
 
     onClosed: {
         if (!editMode) {
@@ -25,22 +28,29 @@ DraggablePopup {
     }
 
     ScrollView {
+        id: nearbyScroll
         Layout.fillWidth: true
         Layout.fillHeight: true
+        contentWidth: availableWidth
         clip: true
-        padding: 20
+        padding: 8
 
         ColumnLayout {
-            width: parent.width
+            width: nearbyScroll.availableWidth
             spacing: 16
 
             Label {
-                text: "📍 当前位置"
+                Layout.leftMargin: root.formMargin
+                Layout.rightMargin: root.formMargin
+                text: "当前位置"
                 font.bold: true
                 color: "#2c3e2f"
             }
+
             SpotPickerRow {
                 id: centerPicker
+                Layout.leftMargin: root.formMargin
+                Layout.rightMargin: root.formMargin
                 spotsModel: root.spotsModel
                 pickMode: "nearby"
                 onMapPickRequested: function(mode) {
@@ -49,19 +59,26 @@ DraggablePopup {
             }
 
             Label {
-                text: "🏫 设施类型"
+                Layout.leftMargin: root.formMargin
+                Layout.rightMargin: root.formMargin
+                text: "设施类型"
                 font.bold: true
                 color: "#2c3e2f"
             }
+
             AppComboBox {
                 id: typeCombo
                 Layout.fillWidth: true
-                model: ["校门", "餐饮食堂", "公共教学楼", "学院专业楼", "体育场地", "宿舍", "图书馆", "诊所", "景点", "活动场地", "其他"]
+                Layout.leftMargin: root.formMargin
+                Layout.rightMargin: root.formMargin
+                model: ["校门", "餐饮食堂", "公共教学楼", "学院专业楼", "校车乘车点", "体育场地", "宿舍", "图书馆", "诊所", "景点", "活动场地", "其他"]
             }
 
             Button {
                 text: "搜索附近"
                 Layout.fillWidth: true
+                Layout.leftMargin: root.formMargin
+                Layout.rightMargin: root.formMargin
                 background: Rectangle { radius: 20; color: "#e67e22" }
                 contentItem: Text {
                     text: parent.text
@@ -73,28 +90,39 @@ DraggablePopup {
             }
 
             Label {
-                text: "📋 搜索结果"
+                Layout.leftMargin: root.formMargin
+                Layout.rightMargin: root.formMargin
+                text: "搜索结果"
                 font.bold: true
                 color: "#2c3e2f"
             }
-            ListView {
+
+            Item {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 220
-                clip: true
-                model: ListModel { id: nearbyListModel }
-                spacing: 6
 
-                delegate: NearbyResultRow {
-                    width: ListView.view.width
-                    spotName: model.spot.name
-                    spotType: model.spot.type
-                    distance: model.distance
-                    number: index + 1
-                    onClicked: {
-                        if (!root.backend || !root.getSpotIdByNameFn) return
-                        var centerId = root.getSpotIdByNameFn(centerPicker.editText)
-                        root.pathCalculated(root.backend.findShortestPath(centerId, model.spot.id))
-                        root.close()
+                ListView {
+                    anchors.fill: parent
+                    clip: true
+                    model: ListModel { id: nearbyListModel }
+                    spacing: 6
+
+                    delegate: NearbyResultRow {
+                        width: ListView.view.width
+                        spotName: model.spot.name
+                        spotType: model.spot.type
+                        distance: model.distance
+                        number: index + 1
+                        onClicked: {
+                            root.spotSelected(model.spot)
+                        }
+                        onNavigateClicked: {
+                            if (!root.backend || !root.getSpotIdByNameFn) return
+                            var centerId = root.getSpotIdByNameFn(centerPicker.editText)
+                            var result = root.backend.findShortestPath(centerId, model.spot.id)
+                            root.pathSelected(centerPicker.editText, model.spot.name, result)
+                            root.close()
+                        }
                     }
                 }
             }
