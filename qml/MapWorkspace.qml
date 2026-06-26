@@ -114,9 +114,11 @@ Item {
             node = root.nodeById[id] || null
         }
 
-        if (node && id < 1000 && root.backend) {
-            var spot = root.backend.spotDetail(id)
+        if (node && node.isSpot === true && root.backend) {
+            var spot = root.backend.spotDetailByNode(id)
             if (spot && spot.id) {
+                node.spotId = spot.id
+                node.nodeId = spot.nodeId
                 node.name = spot.name
                 node.type = spot.type
                 node.intro = spot.intro

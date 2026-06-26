@@ -26,8 +26,8 @@ Item {
 
             property bool isSchoolGate: modelData.type === "校门" || modelData.type === "鏍￠棬"
             property int textWidth: markerText.implicitWidth + (markerContainer.isSchoolGate ? 44 : 32)
-            property real effectiveX: modelData.id === root.previewSpotId ? root.previewSpotX : modelData.x
-            property real effectiveY: modelData.id === root.previewSpotId ? root.previewSpotY : modelData.y
+            property real effectiveX: modelData.nodeId === root.previewSpotId ? root.previewSpotX : modelData.x
+            property real effectiveY: modelData.nodeId === root.previewSpotId ? root.previewSpotY : modelData.y
 
             Rectangle {
                 id: markerRect

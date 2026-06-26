@@ -148,7 +148,7 @@ Item {
                 spotsModel: root.markerSpotsModel
                 editMode: root.editMode
                 focusSpotId: root.focusSpotId
-                previewSpotId: root.previewNodeId < 1000 ? root.previewNodeId : -1
+                previewSpotId: root.isSpotNode(root.previewNodeId) ? root.previewNodeId : -1
                 previewSpotX: root.previewNodeX
                 previewSpotY: root.previewNodeY
                 onSpotClicked: function(spot) {
@@ -209,5 +209,12 @@ Item {
 
     function clearNodePreview() {
         root.previewNodeId = -1
+    }
+
+    function isSpotNode(nodeId) {
+        for (var i = 0; i < root.spotsModel.length; i++) {
+            if (root.spotsModel[i].nodeId === nodeId) return true
+        }
+        return false
     }
 }

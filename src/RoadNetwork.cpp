@@ -126,7 +126,7 @@ bool RoadNetwork::updateNode(const Node& node) {
     int idx = findIndex(node.id);
     if (idx < 0) return false;
     nodes[idx] = node;
-    // 坐标改变不会影响边的连接性，所以邻接表不变
+    refreshEdgeWeightsOfNode(idx);
     return true;
 }
 
@@ -211,6 +211,27 @@ double RoadNetwork::calcDistance(const Node& a, const Node& b) const {
     double dy = a.y - b.y;
     double pixelDist = std::sqrt(dx * dx + dy * dy);
     return pixelDist * scale;
+}
+
+void RoadNetwork::refreshEdgeWeightsOfNode(int idx) {
+    if (idx < 0 || idx >= (int)adj.size()) return;
+
+    int nodeId = nodes[idx].id;
+    for (Edge& edge : adj[idx]) {
+        int toIdx = findIndex(edge.to);
+        if (toIdx >= 0) {
+            edge.weight = (int)(calcDistance(nodes[idx], nodes[toIdx]) + 0.5);
+        }
+    }
+
+    for (int i = 0; i < (int)adj.size(); ++i) {
+        if (i == idx) continue;
+        for (Edge& edge : adj[i]) {
+            if (edge.to == nodeId) {
+                edge.weight = (int)(calcDistance(nodes[i], nodes[idx]) + 0.5);
+            }
+        }
+    }
 }
 
 void RoadNetwork::removeEdgesOfNode(int idx) {

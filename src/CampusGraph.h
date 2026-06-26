@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include "Spot.h"
 #include "RoadNetwork.h"
@@ -20,7 +21,11 @@ public:
     bool addSpot(const Spot& spot);
     bool updateSpot(const Spot& spot);
     bool removeSpot(int id);
+    bool addSpotWithNode(const Spot& spot, const Node& node);
+    bool updateSpotWithNode(const Spot& spot, const Node& node);
+    bool removeSpotAndNode(int id);
     const Spot* getSpotById(int id) const;
+    const Spot* getSpotByNodeId(int nodeId) const;
     const std::vector<Spot>& getAllSpots() const { return spots; }
     int indexOfSpot(int id) const;
     
@@ -34,6 +39,7 @@ public:
     const Node* getNode(int id) const { return roadNetwork.getNode(id); }
     std::vector<int> getNeighbors(int id) const { return roadNetwork.getNeighbors(id); }
     const std::vector<std::vector<Edge>>& getAdjacency() const { return roadNetwork.getAdjacency(); }
+    const std::unordered_map<int, int>& getNodeIndexMap() const { return roadNetwork.getIdToIndex(); }
     
     // 配置
     double getScale() const { return roadNetwork.getScale(); }
@@ -44,12 +50,15 @@ public:
     // 路径查询辅助
     bool hasNode(int id) const { return roadNetwork.hasNode(id); }
     bool hasSpot(int id) const;
+    bool hasSpotNode(int nodeId) const;
     
 private:
     std::vector<Spot> spots;
+    std::unordered_map<int, int> spotIdToIndex;
+    std::unordered_map<int, int> spotNodeToIndex;
     RoadNetwork roadNetwork;
     std::string schoolName = "广西大学";
     std::string mapImage = "campus_map.jpg";
     
-    int findSpotIndex(int id) const;
+    void rebuildSpotMaps();
 };

@@ -22,6 +22,8 @@ public:
     // ========== 景点相关（QML可调用） ==========
     Q_INVOKABLE QVariantList spots() const;
     Q_INVOKABLE QVariantMap spotDetail(int id) const;
+    Q_INVOKABLE QVariantMap spotDetailByNode(int nodeId) const;
+    Q_INVOKABLE bool isSpotNode(int nodeId) const;
     Q_INVOKABLE bool addSpot(int id, const QString& name, const QString& type, 
                              const QString& intro, double x, double y);
     Q_INVOKABLE bool updateSpot(int id, const QString& name, const QString& type,

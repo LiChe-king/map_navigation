@@ -190,8 +190,8 @@ Rectangle {
 
                 Text { text: "类型:"; color: "#7f8c8d"; font.pixelSize: 12 }
                 Text {
-                    text: root.selectedNode ? (root.selectedNode.id < 1000 ? "景点" : "路点") : ""
-                    color: root.selectedNode ? (root.selectedNode.id < 1000 ? "#e74c3c" : "#27ae60") : "#7f8c8d"
+                    text: root.selectedNode ? (root.selectedNode.isSpot === true ? "景点" : "路点") : ""
+                    color: root.selectedNode ? (root.selectedNode.isSpot === true ? "#e74c3c" : "#27ae60") : "#7f8c8d"
                     font.pixelSize: 12
                 }
 

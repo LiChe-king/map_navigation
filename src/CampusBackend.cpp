@@ -68,25 +68,34 @@ QVariantMap CampusBackend::spotDetail(int id) const
     return spot ? spotToMap(*spot) : QVariantMap();
 }
 
+QVariantMap CampusBackend::spotDetailByNode(int nodeId) const
+{
+    const Spot* spot = graph.getSpotByNodeId(nodeId);
+    return spot ? spotToMap(*spot) : QVariantMap();
+}
+
+bool CampusBackend::isSpotNode(int nodeId) const
+{
+    return graph.hasSpotNode(nodeId);
+}
+
 bool CampusBackend::addSpot(int id, const QString& name, const QString& type,
                             const QString& intro, double x, double y)
 {
     Spot spot;
     spot.id = id;
+    spot.nodeId = id;
     spot.name = name.toStdString();
     spot.type = type.toStdString();
     spot.intro = intro.toStdString();
-    spot.x = x;
-    spot.y = y;
     
-    bool ok = graph.addSpot(spot);
+    Node node;
+    node.id = spot.nodeId;
+    node.x = x;
+    node.y = y;
+
+    bool ok = graph.addSpotWithNode(spot, node);
     if (ok) {
-        // 同时自动添加一个同名节点（用于路网）
-        Node node;
-        node.id = id;
-        node.x = x;
-        node.y = y;
-        graph.addNode(node);
         save();
         emit spotsChanged();
         emit nodesChanged();
@@ -98,22 +107,23 @@ bool CampusBackend::addSpot(int id, const QString& name, const QString& type,
 bool CampusBackend::updateSpot(int id, const QString& name, const QString& type,
                                const QString& intro, double x, double y)
 {
+    const Spot* existing = graph.getSpotById(id);
+    if (!existing) return false;
+
     Spot spot;
     spot.id = id;
+    spot.nodeId = existing->nodeId;
     spot.name = name.toStdString();
     spot.type = type.toStdString();
     spot.intro = intro.toStdString();
-    spot.x = x;
-    spot.y = y;
     
-    bool ok = graph.updateSpot(spot);
+    Node node;
+    node.id = spot.nodeId;
+    node.x = x;
+    node.y = y;
+
+    bool ok = graph.updateSpotWithNode(spot, node);
     if (ok) {
-        // 同步更新节点坐标
-        Node node;
-        node.id = id;
-        node.x = x;
-        node.y = y;
-        graph.updateNode(node);
         save();
         emit spotsChanged();
         emit nodesChanged();
@@ -124,9 +134,8 @@ bool CampusBackend::updateSpot(int id, const QString& name, const QString& type,
 
 bool CampusBackend::removeSpot(int id)
 {
-    bool ok = graph.removeSpot(id);
+    bool ok = graph.removeSpotAndNode(id);
     if (ok) {
-        graph.removeNode(id);
         save();
         emit spotsChanged();
         emit nodesChanged();
@@ -288,11 +297,13 @@ QVariantMap CampusBackend::spotToMap(const Spot& spot) const
 {
     QVariantMap item;
     item["id"] = spot.id;
+    item["nodeId"] = spot.nodeId;
     item["name"] = QString::fromStdString(spot.name);
     item["type"] = QString::fromStdString(spot.type);
     item["intro"] = QString::fromStdString(spot.intro);
-    item["x"] = spot.x;
-    item["y"] = spot.y;
+    const Node* node = graph.getNode(spot.nodeId);
+    item["x"] = node ? node->x : 0.0;
+    item["y"] = node ? node->y : 0.0;
     return item;
 }
 
@@ -302,6 +313,7 @@ QVariantMap CampusBackend::nodeToMap(const Node& node) const
     item["id"] = node.id;
     item["x"] = node.x;
     item["y"] = node.y;
+    item["isSpot"] = graph.hasSpotNode(node.id);
     return item;
 }
 
@@ -315,8 +327,8 @@ QVariantMap CampusBackend::pathToMap(const PathResult& path) const
     for (int nodeId : path.nodeIds) {
         ids.push_back(nodeId);
         
-        // 只有景点（id < 1000）才加入 names
-        const Spot* spot = graph.getSpotById(nodeId);
+        // 只有景点（spot node）才加入 names
+        const Spot* spot = graph.getSpotByNodeId(nodeId);
         if (spot) {
             names.push_back(QString::fromStdString(spot->name));
         }
@@ -340,21 +352,23 @@ QVariantMap CampusBackend::pathToMap(const PathResult& path) const
 bool CampusBackend::updateSpotOnly(int id, const QString& name, const QString& type,
                                     const QString& intro, double x, double y)
 {
+    const Spot* existing = graph.getSpotById(id);
+    if (!existing) return false;
+
     Spot spot;
     spot.id = id;
+    spot.nodeId = existing->nodeId;
     spot.name = name.toStdString();
     spot.type = type.toStdString();
     spot.intro = intro.toStdString();
-    spot.x = x;
-    spot.y = y;
     
-    bool ok = graph.updateSpot(spot);
+    Node node;
+    node.id = spot.nodeId;
+    node.x = x;
+    node.y = y;
+
+    bool ok = graph.updateSpotWithNode(spot, node);
     if (ok) {
-        Node node;
-        node.id = id;
-        node.x = x;
-        node.y = y;
-        graph.updateNode(node);
         emit spotsChanged();
         emit nodesChanged();
         emit dataChanged();
@@ -367,19 +381,18 @@ bool CampusBackend::addSpotOnly(int id, const QString& name, const QString& type
 {
     Spot spot;
     spot.id = id;
+    spot.nodeId = id;
     spot.name = name.toStdString();
     spot.type = type.toStdString();
     spot.intro = intro.toStdString();
-    spot.x = x;
-    spot.y = y;
 
-    bool ok = graph.addSpot(spot);
+    Node node;
+    node.id = spot.nodeId;
+    node.x = x;
+    node.y = y;
+
+    bool ok = graph.addSpotWithNode(spot, node);
     if (ok) {
-        Node node;
-        node.id = id;
-        node.x = x;
-        node.y = y;
-        graph.addNode(node);
         emit spotsChanged();
         emit nodesChanged();
         emit dataChanged();
@@ -389,9 +402,8 @@ bool CampusBackend::addSpotOnly(int id, const QString& name, const QString& type
 
 bool CampusBackend::removeSpotOnly(int id)
 {
-    bool ok = graph.removeSpot(id);
+    bool ok = graph.removeSpotAndNode(id);
     if (ok) {
-        graph.removeNode(id);
         emit spotsChanged();
         emit nodesChanged();
         emit edgesChanged();

@@ -31,6 +31,9 @@ private:
     void dfsAllPaths(int currentIdx, int targetIdx, std::vector<bool>& visited,
                      std::vector<int>& path, int length,
                      std::vector<PathResult>& results, int maxCount) const;
+    void runDijkstra(int fromId, std::vector<int>& dist, std::vector<int>& prev,
+                     int stopIdx = -1) const;
+    PathResult buildPathToIndex(const std::vector<int>& prev, int targetIdx, int length) const;
     PathResult buildPathFromNodeIndices(const std::vector<int>& indices, int length) const;
     void sortNearbyByDistance(std::vector<NearbyResult>& items) const;
 };

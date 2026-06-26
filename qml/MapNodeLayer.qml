@@ -29,7 +29,7 @@ Item {
             height: 32
             z: 10
 
-            property bool isSpot: modelData.id < 1000
+            property bool isSpot: modelData.isSpot === true
 
             Rectangle {
                 anchors.fill: parent

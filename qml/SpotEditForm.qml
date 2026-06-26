@@ -9,7 +9,7 @@ ColumnLayout {
 
     signal updateSpotInfo(int nodeId, string name, string type, string intro)
 
-    visible: root.selectedNode && root.selectedNode.id < 1000
+    visible: root.selectedNode && root.selectedNode.isSpot === true
     Layout.fillWidth: true
     spacing: 8
 
@@ -51,7 +51,7 @@ ColumnLayout {
     onSelectedNodeChanged: syncSelectedSpot()
 
     function syncSelectedSpot() {
-        if (!root.selectedNode || root.selectedNode.id >= 1000 || !spotTypeEditor) return
+        if (!root.selectedNode || root.selectedNode.isSpot !== true || !spotTypeEditor) return
         spotTypeEditor.editText = root.selectedNode.type || "景点"
     }
 }

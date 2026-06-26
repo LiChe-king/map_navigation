@@ -9,10 +9,10 @@ QtObject {
     property var editorPanel: null
 
     function moveNode(nodeId, newX, newY) {
-        if (nodeId < 1000) {
-            var spot = backend.spotDetail(nodeId)
+        if (backend.isSpotNode(nodeId)) {
+            var spot = backend.spotDetailByNode(nodeId)
             if (spot.id) {
-                backend.updateSpotOnly(nodeId, spot.name, spot.type, spot.intro, newX, newY)
+                backend.updateSpotOnly(spot.id, spot.name, spot.type, spot.intro, newX, newY)
             }
         } else {
             backend.updateNodeOnly(nodeId, newX, newY)
@@ -27,22 +27,25 @@ QtObject {
     }
 
     function updateSpotName(nodeId, newName) {
-        var spot = backend.spotDetail(nodeId)
+        var spot = backend.spotDetailByNode(nodeId)
         if (!spot.id) return
 
-        backend.updateSpotOnly(nodeId, newName, spot.type, spot.intro, spot.x, spot.y)
+        backend.updateSpotOnly(spot.id, newName, spot.type, spot.intro, spot.x, spot.y)
         if (app.selectedNode) app.selectedNode.name = newName
         workspace.refreshGraph()
         app.hasUnsavedChanges = true
     }
 
     function updateSpotInfo(nodeId, newName, newType, newIntro) {
-        var spot = backend.spotDetail(nodeId)
+        var spot = backend.spotDetailByNode(nodeId)
         if (!spot.id) return
 
-        backend.updateSpotOnly(nodeId, newName, newType, newIntro, spot.x, spot.y)
+        backend.updateSpotOnly(spot.id, newName, newType, newIntro, spot.x, spot.y)
         app.selectedNode = {
             id: nodeId,
+            isSpot: true,
+            spotId: spot.id,
+            nodeId: spot.nodeId,
             name: newName,
             type: newType,
             intro: newIntro,
@@ -94,6 +97,9 @@ QtObject {
 
         app.selectedNode = {
             id: newSpotId,
+            isSpot: true,
+            spotId: newSpotId,
+            nodeId: newSpotId,
             name: name,
             type: type,
             intro: intro,
@@ -106,10 +112,12 @@ QtObject {
     }
 
     function deleteSelectedNode(nodeId) {
-        if (nodeId < 1000) {
-            backend.removeSpotOnly(nodeId)
-            if (app.currentFocusSpotId === nodeId) app.currentFocusSpotId = -1
-            if (app.currentPopupSpot && app.currentPopupSpot.id === nodeId) app.currentPopupSpot = ({})
+        if (backend.isSpotNode(nodeId)) {
+            var spot = backend.spotDetailByNode(nodeId)
+            if (!spot.id) return
+            backend.removeSpotOnly(spot.id)
+            if (app.currentFocusSpotId === spot.id) app.currentFocusSpotId = -1
+            if (app.currentPopupSpot && app.currentPopupSpot.id === spot.id) app.currentPopupSpot = ({})
         } else {
             backend.removeNodeOnly(nodeId)
         }
@@ -134,7 +142,7 @@ QtObject {
         var maxId = 0
         var spots = backend.spots
         for (var i = 0; i < spots.length; i++) {
-            if (spots[i].id > maxId && spots[i].id < 1000) maxId = spots[i].id
+            if (spots[i].id > maxId) maxId = spots[i].id
         }
         return maxId + 1
     }

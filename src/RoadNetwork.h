@@ -32,6 +32,7 @@ public:
 
     // 图结构（邻接表）
     const std::vector<std::vector<Edge>>& getAdjacency() const { return adj; }
+    const std::unordered_map<int, int>& getIdToIndex() const { return idToIndex; }
 
     // 辅助
     int findIndex(int id) const;
@@ -45,6 +46,7 @@ private:
     double scale = 0.35;
 
     double calcDistance(const Node& a, const Node& b) const;
+    void refreshEdgeWeightsOfNode(int idx);
     void removeEdgesOfNode(int idx);          // 删除与索引 idx 节点相连的所有边
     void rebuildIndexMap();                   // 重建 idToIndex 映射
     void resizeAdjacency();                   // 使 adj 大小与 nodes 一致
