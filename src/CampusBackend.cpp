@@ -6,6 +6,10 @@
 #include <QFile>
 #include <QDebug>
 
+namespace {
+constexpr int ROAD_NODE_START_ID = 1000;
+}
+
 CampusBackend::CampusBackend(QObject* parent)
     : QObject(parent)
 {
@@ -82,6 +86,8 @@ bool CampusBackend::isSpotNode(int nodeId) const
 bool CampusBackend::addSpot(int id, const QString& name, const QString& type,
                             const QString& intro, double x, double y)
 {
+    if (id >= ROAD_NODE_START_ID) return false;
+
     Spot spot;
     spot.id = id;
     spot.nodeId = id;
@@ -158,6 +164,8 @@ QVariantList CampusBackend::nodes() const
 
 bool CampusBackend::addNode(int id, double x, double y)
 {
+    if (id < ROAD_NODE_START_ID) return false;
+
     Node node;
     node.id = id;
     node.x = x;
@@ -379,6 +387,8 @@ bool CampusBackend::updateSpotOnly(int id, const QString& name, const QString& t
 bool CampusBackend::addSpotOnly(int id, const QString& name, const QString& type,
                                 const QString& intro, double x, double y)
 {
+    if (id >= ROAD_NODE_START_ID) return false;
+
     Spot spot;
     spot.id = id;
     spot.nodeId = id;
@@ -428,6 +438,8 @@ bool CampusBackend::updateNodeOnly(int id, double x, double y)
 
 bool CampusBackend::addNodeOnly(int id, double x, double y)
 {
+    if (id < ROAD_NODE_START_ID) return false;
+
     Node node;
     node.id = id;
     node.x = x;

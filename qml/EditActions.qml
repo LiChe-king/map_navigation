@@ -89,6 +89,7 @@ QtObject {
 
     function addSpotAt(x, y) {
         var newSpotId = nextSpotId()
+        if (newSpotId < 1) return
         var name = editorPanel.nextSpotName()
         var type = editorPanel.nextSpotType()
         var intro = editorPanel.nextSpotIntro()
@@ -139,11 +140,15 @@ QtObject {
     }
 
     function nextSpotId() {
-        var maxId = 0
+        var used = {}
         var spots = backend.spots
         for (var i = 0; i < spots.length; i++) {
-            if (spots[i].id > maxId) maxId = spots[i].id
+            if (spots[i].id > 0 && spots[i].id < 1000) used[spots[i].id] = true
         }
-        return maxId + 1
+
+        for (var id = 1; id < 1000; id++) {
+            if (!used[id]) return id
+        }
+        return -1
     }
 }

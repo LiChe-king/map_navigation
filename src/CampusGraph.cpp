@@ -50,12 +50,12 @@ bool CampusGraph::loadFromFiles(const std::string& spotsFile,
     while (std::getline(spotInput, line)) {
         if (startsWithCommentOrEmpty(line)) continue;
         std::vector<std::string> parts = splitText(line, ',');
-        if (parts.size() < 5) continue;
+        if (parts.size() < 4) continue;
 
         Spot spot;
         spot.id = std::stoi(parts[0]);
         if (parts.size() >= 6 && !isIntegerText(parts[1])) {
-            // Current format: id,name,type,intro,x,y. The spot id is also its node id.
+            // Legacy format: id,name,type,intro,x,y. The spot id is also its node id.
             spot.nodeId = spot.id;
             spot.name = parts[1];
             spot.type = parts[2];
@@ -68,12 +68,18 @@ bool CampusGraph::loadFromFiles(const std::string& spotsFile,
                 spotNode.y = std::stod(parts[5]);
                 roadNetwork.addNode(spotNode);
             }
-        } else {
+        } else if (parts.size() >= 5 && isIntegerText(parts[1])) {
             // Backward-compatible format: id,nodeId,name,type,intro
             spot.nodeId = std::stoi(parts[1]);
             spot.name = parts[2];
             spot.type = parts[3];
             spot.intro = parts[4];
+        } else {
+            // Current format: id,name,type,intro. Coordinates live in nodes.txt.
+            spot.nodeId = spot.id;
+            spot.name = parts[1];
+            spot.type = parts[2];
+            spot.intro = parts[3];
         }
         spots.push_back(spot);
     }
@@ -97,18 +103,10 @@ bool CampusGraph::saveToFiles(const std::string& spotsFile,
 
     std::ofstream spotOutput(spotsFile);
     if (!spotOutput) return false;
-    spotOutput << "# id,name,type,intro,x,y\n";
+    spotOutput << "# id,name,type,intro\n";
     for (const Spot& spot : spots) {
-        const Node* node = roadNetwork.getNode(spot.id);
-        if (!node) node = roadNetwork.getNode(spot.nodeId);
         spotOutput << spot.id << "," << spot.name << "," << spot.type << ","
-                   << spot.intro << ",";
-        if (node) {
-            spotOutput << node->x << "," << node->y;
-        } else {
-            spotOutput << "0,0";
-        }
-        spotOutput << "\n";
+                   << spot.intro << "\n";
     }
 
     if (!roadNetwork.saveNodes(nodesFile)) return false;
