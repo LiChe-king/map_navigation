@@ -55,7 +55,7 @@ bool CampusGraph::loadFromFiles(const std::string& spotsFile,
         Spot spot;
         spot.id = std::stoi(parts[0]);
         if (parts.size() >= 6 && !isIntegerText(parts[1])) {
-            // Legacy format: id,name,type,intro,x,y
+            // Current format: id,name,type,intro,x,y. The spot id is also its node id.
             spot.nodeId = spot.id;
             spot.name = parts[1];
             spot.type = parts[2];
@@ -69,7 +69,7 @@ bool CampusGraph::loadFromFiles(const std::string& spotsFile,
                 roadNetwork.addNode(spotNode);
             }
         } else {
-            // Current format: id,nodeId,name,type,intro
+            // Backward-compatible format: id,nodeId,name,type,intro
             spot.nodeId = std::stoi(parts[1]);
             spot.name = parts[2];
             spot.type = parts[3];
@@ -97,10 +97,18 @@ bool CampusGraph::saveToFiles(const std::string& spotsFile,
 
     std::ofstream spotOutput(spotsFile);
     if (!spotOutput) return false;
-    spotOutput << "# id,nodeId,name,type,intro\n";
+    spotOutput << "# id,name,type,intro,x,y\n";
     for (const Spot& spot : spots) {
-        spotOutput << spot.id << "," << spot.nodeId << "," << spot.name << ","
-                   << spot.type << "," << spot.intro << "\n";
+        const Node* node = roadNetwork.getNode(spot.id);
+        if (!node) node = roadNetwork.getNode(spot.nodeId);
+        spotOutput << spot.id << "," << spot.name << "," << spot.type << ","
+                   << spot.intro << ",";
+        if (node) {
+            spotOutput << node->x << "," << node->y;
+        } else {
+            spotOutput << "0,0";
+        }
+        spotOutput << "\n";
     }
 
     if (!roadNetwork.saveNodes(nodesFile)) return false;
