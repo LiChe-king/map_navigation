@@ -75,10 +75,10 @@ struct Node {
 
 `Node` 是路径算法真正使用的图顶点。节点分为两类：
 
-- 景点节点：被某个 `Spot.nodeId` 引用。
-- 普通路点：只用于描述道路转折、路口和连通关系。
+- 景点节点：被某个 `Spot.nodeId` 引用，项目约定 ID 小于 `1000`。
+- 普通路点：只用于描述道路转折、路口和连通关系，项目约定 ID 从 `1000` 开始。
 
-判断一个节点是否是景点节点，不依赖 ID 范围，而是通过 `CampusGraph::hasSpotNode(nodeId)` 判断。
+编辑和新增逻辑使用 `1000` 作为景点与路点的编号分界：新增景点只使用 `1-999` 的空闲 ID，新增路点使用 `1000` 及以上 ID。运行时判断一个节点是否是景点节点，仍通过 `CampusGraph::hasSpotNode(nodeId)` 判断，这样可以避免仅靠编号范围误判历史数据或异常数据。
 
 ### 2.3 Edge：邻接表中的边
 
@@ -118,24 +118,28 @@ CampusBackend::load()
 
 1. 先读 `config.txt`，得到比例尺 `scale`、学校名和地图文件名。
 2. 再读 `nodes.txt`，建立全部路网节点和 `idToIndex` 映射。
-3. 再读 `spots.txt`，建立景点列表，并通过 `nodeId` 绑定节点。
+3. 再读 `spots.txt`，建立景点列表。当前格式中景点节点 ID 默认等于景点 ID，坐标从 `nodes.txt` 中读取。
 4. 重建景点索引 `spotIdToIndex` 和 `spotNodeToIndex`。
 5. 最后读 `edges.txt`，此时所有节点已存在，才能正确建立道路边。
 
 `spots.txt` 当前格式为：
 
 ```csv
-# id,nodeId,name,type,intro
-1,1,北西门,校门,校园西北侧出入口
+# id,name,type,intro
+1,北西门,校门,校园西北侧出入口
 ```
 
-程序仍兼容旧格式：
+景点文件不再保存 `x/y` 坐标，所有坐标统一由 `nodes.txt` 管理。程序仍兼容两种历史格式：
 
 ```csv
+# 带坐标的旧格式
 id,name,type,intro,x,y
+
+# 显式 nodeId 的旧格式
+id,nodeId,name,type,intro
 ```
 
-读取旧格式时，代码会令 `spot.nodeId = spot.id`，并在路网中自动补充对应节点；保存时统一写回新格式。
+读取 `id,name,type,intro,x,y` 时，代码会令 `spot.nodeId = spot.id`，并在路网中自动补充对应节点；读取 `id,nodeId,name,type,intro` 时会保留显式绑定关系。保存时统一写回当前格式 `id,name,type,intro`。
 
 ## 4. RoadNetwork：路网邻接表
 
@@ -419,6 +423,15 @@ add/update/remove...Only   只修改内存，不立即保存文件
 
 编辑界面可以用 `Only` 版本提高交互效率，等用户确认后再调用 `save()` 统一写入文件。
 
+### 8.2 ID 分界保护
+
+`CampusBackend` 使用 `ROAD_NODE_START_ID = 1000` 保护新增接口：
+
+- `addSpot()` / `addSpotOnly()` 要求景点 ID 小于 `1000`。
+- `addNode()` / `addNodeOnly()` 要求普通路点 ID 大于等于 `1000`。
+
+这样可以和前端编辑逻辑保持一致，避免新增数据破坏“景点 `<1000`，路点 `>=1000`”的编号约定。
+
 ## 9. QML 前端组织
 
 前端位于 `qml/` 目录，主要文件职责如下：
@@ -434,12 +447,16 @@ PathDrawer.qml           按 PathResult.points 绘制路径
 NavigationPopups.qml     查询、路径、附近搜索弹窗管理
 PathPopup.qml            最短路径查询弹窗
 NearbyPopup.qml          附近搜索弹窗
-QueryPopup.qml           景点查询弹窗
+QueryPopup.qml           景点查询弹窗，支持类型筛选和关键词搜索
 EditorPanel.qml          编辑模式工具面板
 SpotEditForm.qml         景点编辑表单
 ```
 
 QML 不直接维护复杂数据结构，而是通过 `campusBackend` 获取列表、提交编辑操作和发起路径查询。
+
+`QueryPopup.qml` 会从 `spotsModel` 中提取全部景点类型，生成“全部类型 + 类型列表”的下拉框；搜索框会在景点名称、类型和简介中做关键词匹配。筛选结果保存到 `filteredSpotsModel`，列表只渲染筛选后的景点。
+
+`EditActions.qml` 中的新增逻辑也遵守 ID 分界：`nextSpotId()` 在 `1-999` 中寻找空闲 ID，`nextRoadNodeId()` 从现有路点最大 ID 继续递增并保证不小于 `1000`。
 
 ## 10. 数据结构课程设计对应点
 
