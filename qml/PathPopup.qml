@@ -94,19 +94,27 @@ DraggablePopup {
                 Layout.fillWidth: true
                 Layout.leftMargin: root.formMargin
                 Layout.rightMargin: root.formMargin
-                height: 140
+                height: 260
                 color: Qt.rgba(245, 247, 242, 0.7)
                 radius: 12
                 border.color: Qt.rgba(224, 229, 216, 0.6)
 
-                AppTextArea {
-                    id: pathResultText
+                ScrollView {
+                    id: resultScroll
                     anchors.fill: parent
                     anchors.margins: 12
-                    readOnly: true
-                    wrapMode: Text.WordWrap
-                    placeholderText: "路径结果将显示在这里"
-                    font.pixelSize: 13
+                    clip: true
+                    contentWidth: availableWidth
+                    ScrollBar.vertical.policy: ScrollBar.AsNeeded
+
+                    AppTextArea {
+                        id: pathResultText
+                        width: resultScroll.availableWidth
+                        readOnly: true
+                        wrapMode: Text.WordWrap
+                        placeholderText: "路径结果将显示在这里"
+                        font.pixelSize: 13
+                    }
                 }
             }
 
@@ -136,8 +144,14 @@ DraggablePopup {
     function showPath(startName, endName, result) {
         startPicker.editText = startName
         endPicker.editText = endName
-        pathResultText.text = formatPathResult(result)
-        root.pathCalculated(result)
+        var allPaths = []
+        if (root.backend && root.getSpotIdByNameFn) {
+            var startId = root.getSpotIdByNameFn(startName)
+            var endId = root.getSpotIdByNameFn(endName)
+            allPaths = root.backend.findAllPaths(startId, endId, 3)
+        }
+        pathResultText.text = formatPathResult(result, allPaths)
+        root.pathCalculated(resultWithPaths(result, allPaths))
     }
 
     function calculatePath() {
@@ -149,17 +163,50 @@ DraggablePopup {
         var startId = root.getSpotIdByNameFn(startPicker.editText)
         var endId = root.getSpotIdByNameFn(endPicker.editText)
         var result = root.backend.findShortestPath(startId, endId)
-        pathResultText.text = formatPathResult(result)
-        root.pathCalculated(result)
+        var allPaths = root.backend.findAllPaths(startId, endId, 3)
+        pathResultText.text = formatPathResult(result, allPaths)
+        root.pathCalculated(resultWithPaths(result, allPaths))
     }
 
-    function formatPathResult(result) {
+    function resultWithPaths(result, allPaths) {
+        if (!result) return {}
+
+        var paths = allPaths || []
+        if (paths.length <= 0 && result.points && result.points.length > 0) {
+            paths = [result]
+        }
+
+        var next = {}
+        for (var key in result) {
+            next[key] = result[key]
+        }
+        next.paths = paths
+        return next
+    }
+
+    function formatPathResult(result, allPaths) {
         if (!result) return ""
 
         var distance = result.length || result.totalLength || 0
         var names = result.names || []
-        return names.length > 0
-            ? names.join(" → ") + "\n\n总距离：" + distance + " 米"
-            : "未找到可达路径"
+        if (names.length <= 0) return "未找到可达路径"
+
+        var text = "最短路径：\n" + names.join(" → ") + "\n总距离：" + distance + " 米"
+        var paths = allPaths || []
+        if (paths.length <= 0) {
+            return text + "\n\n所有可选路径：未找到"
+        }
+
+        text += "\n\n所有可选路径（按距离排序，最多显示 3 条）："
+        for (var i = 0; i < paths.length; i++) {
+            var path = paths[i]
+            var pathNames = path.names || []
+            var pathDistance = path.length || path.totalLength || 0
+            if (pathNames.length <= 0) continue
+            text += "\n\n" + (i + 1) + ". " + pathNames.join(" → ")
+                  + "\n   距离：" + pathDistance + " 米"
+        }
+
+        return text
     }
 }

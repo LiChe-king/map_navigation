@@ -43,6 +43,7 @@ public:
     
     // ========== 查询（QML可调用） ==========
     Q_INVOKABLE QVariantMap findShortestPath(int fromId, int toId) const;
+    Q_INVOKABLE QVariantList findAllPaths(int fromId, int toId, int limit = 3) const;
     Q_INVOKABLE QVariantList findNearby(int fromId, const QString& type, int limit) const;
     Q_INVOKABLE QVariantMap config() const;
     

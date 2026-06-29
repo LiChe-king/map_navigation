@@ -3,6 +3,7 @@ import QtQuick
 Canvas {
     id: root
     property var pathPoints: []
+    property var pathResults: []
     property bool animated: false
     property real animationProgress: 1
     property real lineWidth: 15
@@ -16,33 +17,52 @@ Canvas {
     onPathPointsChanged: {
         requestPaint()
     }
+    onPathResultsChanged: {
+        requestPaint()
+    }
 
     onPaint: {
         var ctx = getContext("2d")
         ctx.clearRect(0, 0, width, height)
 
-        if (!pathPoints || pathPoints.length < 2) return
+        if (pathResults && pathResults.length > 0) {
+            var basePoints = pathResults[0].points || []
+            for (var i = pathResults.length - 1; i >= 1; i--) {
+                drawPath(ctx, pathResults[i].points || [], "#7a4a00", "#f39c12", 10, false, i + 1, basePoints)
+            }
+            drawPath(ctx, basePoints, "#1a3a5c", "#3498db", lineWidth, true, "", [])
+            return
+        }
 
-        var smoothPoints = generateAdaptiveSmoothPoints(pathPoints)
+        drawPath(ctx, pathPoints || [], "#1a3a5c", "#3498db", lineWidth, true, "", [])
+    }
+
+    function drawPath(ctx, points, borderColor, pathColor, widthValue, showMarks, labelText, basePoints) {
+        if (!points || points.length < 2) return
+
+        var smoothPoints = generateAdaptiveSmoothPoints(points)
         if (smoothPoints.length < 2) return
 
-        // 1. 外边框（深蓝色）
         ctx.shadowBlur = 0
-        ctx.lineWidth = lineWidth + borderWidth * 2
+        ctx.lineWidth = widthValue + borderWidth * 2
         ctx.lineCap = "round"
         ctx.lineJoin = "round"
-        ctx.strokeStyle = "#1a3a5c"
+        ctx.strokeStyle = borderColor
         drawCurve(ctx, smoothPoints)
         ctx.stroke()
 
-        // 2. 主线条（亮蓝色）
-        ctx.lineWidth = lineWidth
-        ctx.strokeStyle = "#3498db"
+        ctx.lineWidth = widthValue
+        ctx.strokeStyle = pathColor
         drawCurve(ctx, smoothPoints)
         ctx.stroke()
 
-        // 3. 绘制 V 形标记（沿路径）- 放在线条之上
-        drawVShapesAlongPath(ctx, smoothPoints)
+        if (showMarks) {
+            drawVShapesAlongPath(ctx, smoothPoints)
+        }
+
+        if (labelText !== "") {
+            drawPathLabel(ctx, points, smoothPoints, labelText, borderColor, pathColor, basePoints || [])
+        }
     }
 
     function drawCurve(ctx, points) {
@@ -99,6 +119,91 @@ Canvas {
             }
         }
         return null
+    }
+
+    function pathSegments(points) {
+        var totalLength = 0
+        var segments = []
+        for (var i = 1; i < points.length; i++) {
+            var dx = points[i].x - points[i-1].x
+            var dy = points[i].y - points[i-1].y
+            var segLen = Math.sqrt(dx*dx + dy*dy)
+            segments.push({
+                from: points[i-1],
+                to: points[i],
+                length: segLen,
+                cumulative: totalLength,
+                angle: Math.atan2(dy, dx)
+            })
+            totalLength += segLen
+        }
+        return { totalLength: totalLength, segments: segments }
+    }
+
+    function drawPathLabel(ctx, originalPoints, smoothPoints, labelText, borderColor, fillColor, basePoints) {
+        if (smoothPoints.length < 2) return
+
+        var labelPoints = findDivergentSegmentPoints(originalPoints, basePoints)
+        var points = labelPoints.length >= 2 ? labelPoints : smoothPoints
+        var data = pathSegments(points)
+        if (data.totalLength <= 0) return
+
+        var pos = findPositionAtDistance(data.segments, data.totalLength * 0.5)
+        if (!pos) return
+
+        var radius = 18
+        ctx.save()
+        ctx.beginPath()
+        ctx.arc(pos.point.x, pos.point.y, radius, 0, Math.PI * 2)
+        ctx.fillStyle = fillColor
+        ctx.fill()
+        ctx.lineWidth = 4
+        ctx.strokeStyle = borderColor
+        ctx.stroke()
+
+        ctx.fillStyle = "white"
+        ctx.font = "bold 20px sans-serif"
+        ctx.textAlign = "center"
+        ctx.textBaseline = "middle"
+        ctx.fillText(labelText, pos.point.x, pos.point.y + 1)
+        ctx.restore()
+    }
+
+    function samePoint(a, b) {
+        if (!a || !b) return false
+        return Math.abs(a.x - b.x) < 0.001 && Math.abs(a.y - b.y) < 0.001
+    }
+
+    function hasSegment(points, fromPoint, toPoint) {
+        for (var i = 1; i < points.length; i++) {
+            var a = points[i - 1]
+            var b = points[i]
+            if ((samePoint(a, fromPoint) && samePoint(b, toPoint))
+                    || (samePoint(a, toPoint) && samePoint(b, fromPoint))) {
+                return true
+            }
+        }
+        return false
+    }
+
+    function findDivergentSegmentPoints(points, basePoints) {
+        if (!points || points.length < 2 || !basePoints || basePoints.length < 2) return []
+
+        var best = []
+        var current = []
+        for (var i = 1; i < points.length; i++) {
+            var fromPoint = points[i - 1]
+            var toPoint = points[i]
+            if (!hasSegment(basePoints, fromPoint, toPoint)) {
+                if (current.length === 0) current.push(fromPoint)
+                current.push(toPoint)
+            } else {
+                if (current.length > best.length) best = current
+                current = []
+            }
+        }
+        if (current.length > best.length) best = current
+        return best
     }
 
     // 绘制 V 形（沿着前进方向开口向前）

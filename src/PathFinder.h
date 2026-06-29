@@ -22,15 +22,12 @@ public:
     explicit PathFinder(const CampusGraph* graph);
     
     PathResult shortestPath(int fromId, int toId) const;
-    std::vector<PathResult> allSimplePaths(int fromId, int toId, int maxCount = 30) const;
+    std::vector<PathResult> allSimplePaths(int fromId, int toId, int maxCount = 3) const;
     std::vector<NearbyResult> nearestByType(int fromId, const std::string& type, int limit) const;
 
 private:
     const CampusGraph* graph = nullptr;
     
-    void dfsAllPaths(int currentIdx, int targetIdx, std::vector<bool>& visited,
-                     std::vector<int>& path, int length,
-                     std::vector<PathResult>& results, int maxCount) const;
     void runDijkstra(int fromId, std::vector<int>& dist, std::vector<int>& prev,
                      int stopIdx = -1) const;
     PathResult buildPathToIndex(const std::vector<int>& prev, int targetIdx, int length) const;

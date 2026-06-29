@@ -86,6 +86,7 @@ Item {
             PathDrawer {
                 anchors.fill: parent
                 pathPoints: root.pathResult.points || []
+                pathResults: root.pathResult.paths || []
             }
 
             MouseArea {

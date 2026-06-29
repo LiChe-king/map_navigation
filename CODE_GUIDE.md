@@ -310,7 +310,27 @@ struct PathResult {
 
 `spotIds` 通过 `graph->getSpotByNodeId(node.id)` 判断，不通过节点编号范围判断。
 
-### 6.2 Dijkstra 实现
+### 6.2 所有可选简单路径
+
+入口：
+
+```cpp
+std::vector<PathResult> allSimplePaths(int fromId, int toId, int maxCount = 3) const;
+```
+
+该接口用于查询任意两个景点之间距离较短的可选简单路径。简单路径要求同一条路径中不重复经过同一个节点，因此不会出现绕圈路径。实现采用“基于最短路径偏离”的思路，而不是全图暴力枚举：
+
+1. 先用 Dijkstra 得到第 1 条最短路径。
+2. 以已找到的路径为基础，依次选择路径中的某个节点作为偏离点。
+3. 保留起点到偏离点之前的最短路径前缀。
+4. 临时禁止继续走已找到路径在该偏离点后的下一条边。
+5. 从偏离点重新运行 Dijkstra 接回终点，生成一条候选路径。
+6. 对候选路径按总长度排序，取最短的一条作为下一条可选路径。
+7. 重复以上过程，直到得到 `maxCount` 条或没有更多合理候选。
+
+前端默认只请求 3 条，用于避免复杂路网中简单路径数量过多导致界面卡顿。
+
+### 6.3 Dijkstra 实现
 
 核心函数：
 
@@ -329,7 +349,7 @@ visited[i]   第 i 个节点是否已经确定最短距离
 
 `stopIdx` 用于最短路径查询：当目标节点已确定最短距离时可以提前退出。附近搜索需要起点到所有节点的距离，因此不传 `stopIdx`。
 
-### 6.3 附近设施搜索
+### 6.4 附近设施搜索
 
 入口：
 
@@ -396,6 +416,7 @@ spotDetail(id)
 spotDetailByNode(nodeId)
 isSpotNode(nodeId)
 findShortestPath(fromId, toId)
+findAllPaths(fromId, toId, limit)
 findNearby(fromId, type, limit)
 addSpot(...) / updateSpot(...) / removeSpot(...)
 addNode(...) / updateNode(...) / removeNode(...)
@@ -443,7 +464,7 @@ MapWorkspace.qml         地图页与编辑面板的组合
 SpotMarkersLayer.qml     景点标记显示和点击
 MapNodeLayer.qml         编辑模式下的节点显示、拖拽和连线
 MapEdgesLayer.qml        道路边显示和删除
-PathDrawer.qml           按 PathResult.points 绘制路径
+PathDrawer.qml           按 PathResult.points/paths 绘制单条或多条路径
 NavigationPopups.qml     查询、路径、附近搜索弹窗管理
 PathPopup.qml            最短路径查询弹窗
 NearbyPopup.qml          附近搜索弹窗
@@ -453,6 +474,8 @@ SpotEditForm.qml         景点编辑表单
 ```
 
 QML 不直接维护复杂数据结构，而是通过 `campusBackend` 获取列表、提交编辑操作和发起路径查询。
+
+路径查询结果会把最短路径放在 `paths[0]`，其他可选路径放在后续位置。地图绘制时最短路径保持蓝色，其他可选路径统一使用橙色，并在与最短路径分叉后的独立路段上标注 `2`、`3` 等序号，以便同时对比多条路线。
 
 `QueryPopup.qml` 会从 `spotsModel` 中提取全部景点类型，生成“全部类型 + 类型列表”的下拉框；搜索框会在景点名称、类型和简介中做关键词匹配。筛选结果保存到 `filteredSpotsModel`，列表只渲染筛选后的景点。
 

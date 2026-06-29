@@ -263,6 +263,17 @@ QVariantMap CampusBackend::findShortestPath(int fromId, int toId) const
     return pathToMap(result);
 }
 
+QVariantList CampusBackend::findAllPaths(int fromId, int toId, int limit) const
+{
+    PathFinder finder(&graph);
+    QVariantList result;
+
+    for (const PathResult& path : finder.allSimplePaths(fromId, toId, limit)) {
+        result.push_back(pathToMap(path));
+    }
+    return result;
+}
+
 QVariantList CampusBackend::findNearby(int fromId, const QString& type, int limit) const
 {
     PathFinder finder(&graph);

@@ -3,9 +3,48 @@
 
 #include <algorithm>
 #include <limits>
+#include <queue>
 
 namespace {
 constexpr int INF_DISTANCE = std::numeric_limits<int>::max() / 4;
+
+struct QueueState {
+    int idx = -1;
+    int distance = 0;
+};
+
+struct LongerDistanceFirst {
+    bool operator()(const QueueState& a, const QueueState& b) const
+    {
+        return a.distance > b.distance;
+    }
+};
+
+bool samePrefix(const std::vector<int>& path, const std::vector<int>& prefix)
+{
+    return path.size() >= prefix.size()
+        && std::equal(prefix.begin(), prefix.end(), path.begin());
+}
+
+bool samePath(const PathResult& path, const std::vector<int>& ids)
+{
+    return path.nodeIds == ids;
+}
+
+bool hasPath(const std::vector<PathResult>& paths, const std::vector<int>& ids)
+{
+    return std::any_of(paths.begin(), paths.end(), [&ids](const PathResult& path) {
+        return samePath(path, ids);
+    });
+}
+
+bool hasEdgeBan(const std::vector<std::pair<int, int>>& bannedEdges, int fromId, int toId)
+{
+    return std::any_of(bannedEdges.begin(), bannedEdges.end(),
+                       [fromId, toId](const std::pair<int, int>& edge) {
+                           return edge.first == fromId && edge.second == toId;
+                       });
+}
 }
 
 PathFinder::PathFinder(const CampusGraph* graph) : graph(graph) {}
@@ -155,5 +194,142 @@ void PathFinder::sortNearbyByDistance(std::vector<NearbyResult>& items) const
 std::vector<PathResult> PathFinder::allSimplePaths(int fromId, int toId, int maxCount) const
 {
     std::vector<PathResult> results;
+    if (!graph || maxCount <= 0) return results;
+
+    PathResult shortest = shortestPath(fromId, toId);
+    if (shortest.nodeIds.empty()) return results;
+    results.push_back(shortest);
+    if (maxCount == 1) return results;
+
+    const auto& nodes = graph->getAllNodes();
+    const auto& adj = graph->getAdjacency();
+    const auto& idToIdx = graph->getNodeIndexMap();
+    auto itTo = idToIdx.find(toId);
+    const int targetIdx = itTo->second;
+
+    auto edgeWeight = [&idToIdx, &adj](int fromNodeId, int toNodeId) {
+        auto itFromIdx = idToIdx.find(fromNodeId);
+        if (itFromIdx == idToIdx.end()) return INF_DISTANCE;
+        for (const Edge& edge : adj[itFromIdx->second]) {
+            if (edge.to == toNodeId) return edge.weight;
+        }
+        return INF_DISTANCE;
+    };
+
+    auto pathLength = [&edgeWeight](const std::vector<int>& nodeIds) {
+        int length = 0;
+        for (int i = 1; i < static_cast<int>(nodeIds.size()); ++i) {
+            int weight = edgeWeight(nodeIds[i - 1], nodeIds[i]);
+            if (weight == INF_DISTANCE) return INF_DISTANCE;
+            length += weight;
+        }
+        return length;
+    };
+
+    auto dijkstraWithBans = [&](int spurNodeId,
+                                const std::vector<bool>& bannedNodes,
+                                const std::vector<std::pair<int, int>>& bannedEdges) {
+        std::vector<int> empty;
+        auto itSpur = idToIdx.find(spurNodeId);
+        if (itSpur == idToIdx.end()) return std::pair<std::vector<int>, int>(empty, INF_DISTANCE);
+
+        const int n = static_cast<int>(nodes.size());
+        std::vector<int> dist(n, INF_DISTANCE);
+        std::vector<int> prev(n, -1);
+        std::vector<bool> visited(n, false);
+        std::priority_queue<QueueState, std::vector<QueueState>, LongerDistanceFirst> queue;
+
+        int spurIdx = itSpur->second;
+        dist[spurIdx] = 0;
+        queue.push({spurIdx, 0});
+
+        while (!queue.empty()) {
+            QueueState current = queue.top();
+            queue.pop();
+
+            int currentIdx = current.idx;
+            if (currentIdx < 0 || currentIdx >= n || visited[currentIdx]) continue;
+            visited[currentIdx] = true;
+            if (currentIdx == targetIdx) break;
+
+            int currentNodeId = nodes[currentIdx].id;
+            for (const Edge& edge : adj[currentIdx]) {
+                auto itNext = idToIdx.find(edge.to);
+                if (itNext == idToIdx.end()) continue;
+
+                int nextIdx = itNext->second;
+                if (visited[nextIdx] || bannedNodes[nextIdx]) continue;
+                if (hasEdgeBan(bannedEdges, currentNodeId, edge.to)) continue;
+
+                int candidate = dist[currentIdx] + edge.weight;
+                if (candidate < dist[nextIdx]) {
+                    dist[nextIdx] = candidate;
+                    prev[nextIdx] = currentIdx;
+                    queue.push({nextIdx, candidate});
+                }
+            }
+        }
+
+        if (dist[targetIdx] == INF_DISTANCE) {
+            return std::pair<std::vector<int>, int>(empty, INF_DISTANCE);
+        }
+
+        std::vector<int> path;
+        for (int at = targetIdx; at != -1; at = prev[at]) {
+            path.push_back(at);
+        }
+        std::reverse(path.begin(), path.end());
+        return std::pair<std::vector<int>, int>(path, dist[targetIdx]);
+    };
+
+    std::vector<PathResult> candidates;
+    for (int k = 1; k < maxCount; ++k) {
+        const PathResult& basePath = results[k - 1];
+
+        for (int spurPos = 0; spurPos < static_cast<int>(basePath.nodeIds.size()) - 1; ++spurPos) {
+            std::vector<int> rootIds(basePath.nodeIds.begin(), basePath.nodeIds.begin() + spurPos + 1);
+            int rootLength = pathLength(rootIds);
+            if (rootLength == INF_DISTANCE) continue;
+
+            std::vector<bool> bannedNodes(nodes.size(), false);
+            for (int i = 0; i < spurPos; ++i) {
+                auto itRoot = idToIdx.find(rootIds[i]);
+                if (itRoot != idToIdx.end()) bannedNodes[itRoot->second] = true;
+            }
+
+            std::vector<std::pair<int, int>> bannedEdges;
+            for (const PathResult& path : results) {
+                if (samePrefix(path.nodeIds, rootIds)
+                    && static_cast<int>(path.nodeIds.size()) > spurPos + 1) {
+                    bannedEdges.push_back({path.nodeIds[spurPos], path.nodeIds[spurPos + 1]});
+                }
+            }
+
+            auto spurResult = dijkstraWithBans(rootIds.back(), bannedNodes, bannedEdges);
+            if (spurResult.first.empty()) continue;
+
+            std::vector<int> totalIds = rootIds;
+            for (int i = 1; i < static_cast<int>(spurResult.first.size()); ++i) {
+                totalIds.push_back(nodes[spurResult.first[i]].id);
+            }
+
+            if (hasPath(results, totalIds) || hasPath(candidates, totalIds)) continue;
+
+            std::vector<int> totalIndices;
+            for (int nodeId : totalIds) {
+                auto itIdx = idToIdx.find(nodeId);
+                if (itIdx != idToIdx.end()) totalIndices.push_back(itIdx->second);
+            }
+            candidates.push_back(buildPathFromNodeIndices(totalIndices, rootLength + spurResult.second));
+        }
+
+        if (candidates.empty()) break;
+        std::sort(candidates.begin(), candidates.end(), [](const PathResult& a, const PathResult& b) {
+            return a.totalLength < b.totalLength;
+        });
+        results.push_back(candidates.front());
+        candidates.erase(candidates.begin());
+    }
+
     return results;
 }
