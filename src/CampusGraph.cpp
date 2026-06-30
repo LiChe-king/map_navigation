@@ -1,22 +1,7 @@
 #include "CampusGraph.h"
 #include "ParserUtils.h"
 
-#include <algorithm>
-#include <cctype>
 #include <fstream>
-
-namespace {
-bool isIntegerText(const std::string& value)
-{
-    if (value.empty()) return false;
-    int start = value[0] == '-' ? 1 : 0;
-    if (start >= static_cast<int>(value.size())) return false;
-    for (int i = start; i < static_cast<int>(value.size()); ++i) {
-        if (!std::isdigit(static_cast<unsigned char>(value[i]))) return false;
-    }
-    return true;
-}
-}
 
 bool CampusGraph::loadFromFiles(const std::string& spotsFile,
                                 const std::string& nodesFile,
@@ -53,34 +38,10 @@ bool CampusGraph::loadFromFiles(const std::string& spotsFile,
         if (parts.size() < 4) continue;
 
         Spot spot;
-        spot.id = std::stoi(parts[0]);
-        if (parts.size() >= 6 && !isIntegerText(parts[1])) {
-            // Legacy format: id,name,type,intro,x,y. The spot id is also its node id.
-            spot.nodeId = spot.id;
-            spot.name = parts[1];
-            spot.type = parts[2];
-            spot.intro = parts[3];
-
-            if (!roadNetwork.hasNode(spot.nodeId)) {
-                Node spotNode;
-                spotNode.id = spot.nodeId;
-                spotNode.x = std::stod(parts[4]);
-                spotNode.y = std::stod(parts[5]);
-                roadNetwork.addNode(spotNode);
-            }
-        } else if (parts.size() >= 5 && isIntegerText(parts[1])) {
-            // Backward-compatible format: id,nodeId,name,type,intro
-            spot.nodeId = std::stoi(parts[1]);
-            spot.name = parts[2];
-            spot.type = parts[3];
-            spot.intro = parts[4];
-        } else {
-            // Current format: id,name,type,intro. Coordinates live in nodes.txt.
-            spot.nodeId = spot.id;
-            spot.name = parts[1];
-            spot.type = parts[2];
-            spot.intro = parts[3];
-        }
+        spot.nodeId = std::stoi(parts[0]);
+        spot.name = parts[1];
+        spot.type = parts[2];
+        spot.intro = parts[3];
         spots.push_back(spot);
     }
     rebuildSpotMaps();
@@ -103,9 +64,9 @@ bool CampusGraph::saveToFiles(const std::string& spotsFile,
 
     std::ofstream spotOutput(spotsFile);
     if (!spotOutput) return false;
-    spotOutput << "# id,name,type,intro\n";
+    spotOutput << "# nodeId,name,type,intro\n";
     for (const Spot& spot : spots) {
-        spotOutput << spot.id << "," << spot.name << "," << spot.type << ","
+        spotOutput << spot.nodeId << "," << spot.name << "," << spot.type << ","
                    << spot.intro << "\n";
     }
 
@@ -115,26 +76,9 @@ bool CampusGraph::saveToFiles(const std::string& spotsFile,
     return true;
 }
 
-int CampusGraph::indexOfSpot(int id) const
-{
-    auto it = spotIdToIndex.find(id);
-    return it == spotIdToIndex.end() ? -1 : it->second;
-}
-
-bool CampusGraph::hasSpot(int id) const
-{
-    return indexOfSpot(id) >= 0;
-}
-
 bool CampusGraph::hasSpotNode(int nodeId) const
 {
     return spotNodeToIndex.find(nodeId) != spotNodeToIndex.end();
-}
-
-const Spot* CampusGraph::getSpotById(int id) const
-{
-    int idx = indexOfSpot(id);
-    return idx < 0 ? nullptr : &spots[idx];
 }
 
 const Spot* CampusGraph::getSpotByNodeId(int nodeId) const
@@ -145,7 +89,7 @@ const Spot* CampusGraph::getSpotByNodeId(int nodeId) const
 
 bool CampusGraph::addSpot(const Spot& spot)
 {
-    if (hasSpot(spot.id) || hasSpotNode(spot.nodeId)) return false;
+    if (hasSpotNode(spot.nodeId)) return false;
     spots.push_back(spot);
     rebuildSpotMaps();
     return true;
@@ -153,17 +97,18 @@ bool CampusGraph::addSpot(const Spot& spot)
 
 bool CampusGraph::updateSpot(const Spot& spot)
 {
-    int idx = indexOfSpot(spot.id);
+    auto it = spotNodeToIndex.find(spot.nodeId);
+    int idx = it == spotNodeToIndex.end() ? -1 : it->second;
     if (idx < 0) return false;
-    if (spots[idx].nodeId != spot.nodeId && hasSpotNode(spot.nodeId)) return false;
     spots[idx] = spot;
     rebuildSpotMaps();
     return true;
 }
 
-bool CampusGraph::removeSpot(int id)
+bool CampusGraph::removeSpot(int nodeId)
 {
-    int idx = indexOfSpot(id);
+    auto it = spotNodeToIndex.find(nodeId);
+    int idx = it == spotNodeToIndex.end() ? -1 : it->second;
     if (idx < 0) return false;
     spots.erase(spots.begin() + idx);
     rebuildSpotMaps();
@@ -172,7 +117,7 @@ bool CampusGraph::removeSpot(int id)
 
 bool CampusGraph::addSpotWithNode(const Spot& spot, const Node& node)
 {
-    if (spot.nodeId != node.id || hasSpot(spot.id) || hasSpotNode(spot.nodeId)) return false;
+    if (spot.nodeId != node.id || hasSpotNode(spot.nodeId)) return false;
 
     bool nodeAlreadyExists = hasNode(node.id);
     if (nodeAlreadyExists) {
@@ -192,21 +137,20 @@ bool CampusGraph::addSpotWithNode(const Spot& spot, const Node& node)
 
 bool CampusGraph::updateSpotWithNode(const Spot& spot, const Node& node)
 {
-    int idx = indexOfSpot(spot.id);
+    auto it = spotNodeToIndex.find(spot.nodeId);
+    int idx = it == spotNodeToIndex.end() ? -1 : it->second;
     if (idx < 0 || spot.nodeId != node.id) return false;
-    if (spots[idx].nodeId != spot.nodeId && hasSpotNode(spot.nodeId)) return false;
     if (!hasNode(node.id) || !updateNode(node)) return false;
     spots[idx] = spot;
     rebuildSpotMaps();
     return true;
 }
 
-bool CampusGraph::removeSpotAndNode(int id)
+bool CampusGraph::removeSpotAndNode(int nodeId)
 {
-    const Spot* spot = getSpotById(id);
+    const Spot* spot = getSpotByNodeId(nodeId);
     if (!spot) return false;
-    int nodeId = spot->nodeId;
-    if (!removeSpot(id)) return false;
+    if (!removeSpot(nodeId)) return false;
     removeNode(nodeId);
     return true;
 }
@@ -238,10 +182,8 @@ bool CampusGraph::removeEdge(int from, int to)
 
 void CampusGraph::rebuildSpotMaps()
 {
-    spotIdToIndex.clear();
     spotNodeToIndex.clear();
     for (int i = 0; i < static_cast<int>(spots.size()); ++i) {
-        spotIdToIndex[spots[i].id] = i;
         spotNodeToIndex[spots[i].nodeId] = i;
     }
 }

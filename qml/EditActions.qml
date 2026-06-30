@@ -11,8 +11,8 @@ QtObject {
     function moveNode(nodeId, newX, newY) {
         if (backend.isSpotNode(nodeId)) {
             var spot = backend.spotDetailByNode(nodeId)
-            if (spot.id) {
-                backend.updateSpotOnly(spot.id, spot.name, spot.type, spot.intro, newX, newY)
+            if (spot.nodeId) {
+                backend.updateSpotOnly(spot.nodeId, spot.name, spot.type, spot.intro, newX, newY)
             }
         } else {
             backend.updateNodeOnly(nodeId, newX, newY)
@@ -28,9 +28,9 @@ QtObject {
 
     function updateSpotName(nodeId, newName) {
         var spot = backend.spotDetailByNode(nodeId)
-        if (!spot.id) return
+        if (!spot.nodeId) return
 
-        backend.updateSpotOnly(spot.id, newName, spot.type, spot.intro, spot.x, spot.y)
+        backend.updateSpotOnly(spot.nodeId, newName, spot.type, spot.intro, spot.x, spot.y)
         if (app.selectedNode) app.selectedNode.name = newName
         workspace.refreshGraph()
         app.hasUnsavedChanges = true
@@ -38,13 +38,12 @@ QtObject {
 
     function updateSpotInfo(nodeId, newName, newType, newIntro) {
         var spot = backend.spotDetailByNode(nodeId)
-        if (!spot.id) return
+        if (!spot.nodeId) return
 
-        backend.updateSpotOnly(spot.id, newName, newType, newIntro, spot.x, spot.y)
+        backend.updateSpotOnly(spot.nodeId, newName, newType, newIntro, spot.x, spot.y)
         app.selectedNode = {
             id: nodeId,
             isSpot: true,
-            spotId: spot.id,
             nodeId: spot.nodeId,
             name: newName,
             type: newType,
@@ -88,26 +87,25 @@ QtObject {
     }
 
     function addSpotAt(x, y) {
-        var newSpotId = nextSpotId()
-        if (newSpotId < 1) return
+        var newSpotNodeId = nextSpotNodeId()
+        if (newSpotNodeId < 1) return
         var name = editorPanel.nextSpotName()
         var type = editorPanel.nextSpotType()
         var intro = editorPanel.nextSpotIntro()
 
-        if (!backend.addSpotOnly(newSpotId, name, type, intro, x, y)) return
+        if (!backend.addSpotOnly(newSpotNodeId, name, type, intro, x, y)) return
 
         app.selectedNode = {
-            id: newSpotId,
+            id: newSpotNodeId,
             isSpot: true,
-            spotId: newSpotId,
-            nodeId: newSpotId,
+            nodeId: newSpotNodeId,
             name: name,
             type: type,
             intro: intro,
             x: x,
             y: y
         }
-        app.currentFocusSpotId = newSpotId
+        app.currentFocusSpotId = newSpotNodeId
         workspace.refreshGraph()
         app.hasUnsavedChanges = true
     }
@@ -115,10 +113,10 @@ QtObject {
     function deleteSelectedNode(nodeId) {
         if (backend.isSpotNode(nodeId)) {
             var spot = backend.spotDetailByNode(nodeId)
-            if (!spot.id) return
-            backend.removeSpotOnly(spot.id)
-            if (app.currentFocusSpotId === spot.id) app.currentFocusSpotId = -1
-            if (app.currentPopupSpot && app.currentPopupSpot.id === spot.id) app.currentPopupSpot = ({})
+            if (!spot.nodeId) return
+            backend.removeSpotOnly(spot.nodeId)
+            if (app.currentFocusSpotId === spot.nodeId) app.currentFocusSpotId = -1
+            if (app.currentPopupSpot && app.currentPopupSpot.nodeId === spot.nodeId) app.currentPopupSpot = ({})
         } else {
             backend.removeNodeOnly(nodeId)
         }
@@ -139,11 +137,11 @@ QtObject {
         return Math.max(maxId + 1, 1000)
     }
 
-    function nextSpotId() {
+    function nextSpotNodeId() {
         var used = {}
         var spots = backend.spots
         for (var i = 0; i < spots.length; i++) {
-            if (spots[i].id > 0 && spots[i].id < 1000) used[spots[i].id] = true
+            if (spots[i].nodeId > 0 && spots[i].nodeId < 1000) used[spots[i].nodeId] = true
         }
 
         for (var id = 1; id < 1000; id++) {

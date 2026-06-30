@@ -35,7 +35,7 @@ Item {
                 height: markerContainer.isSchoolGate ? 70 : 40
                 radius: markerContainer.isSchoolGate ? 30 : 15
                 color: "#ffffff"
-                border.color: modelData.id === root.focusSpotId ? "#ffcf33" : "#d0d5cc"
+                border.color: modelData.nodeId === root.focusSpotId ? "#ffcf33" : "#d0d5cc"
                 border.width: markerContainer.isSchoolGate ? 2 : 1.5
 
                 layer.enabled: true

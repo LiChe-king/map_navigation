@@ -6,13 +6,13 @@
 
 struct PathResult {
     std::vector<int> nodeIds;
-    std::vector<int> spotIds;
+    std::vector<int> spotNodeIds;
     std::vector<std::pair<double, double>> drawPoints;
     int totalLength = 0;
 };
 
 struct NearbyResult {
-    int spotId = -1;
+    int spotNodeId = -1;
     int distance = 0;
     PathResult path;
 };

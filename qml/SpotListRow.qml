@@ -5,7 +5,7 @@ import QtQuick.Layouts
 Rectangle {
     id: root
 
-    property int spotId: 0
+    property int spotNodeId: 0
     property string spotName: ""
     property string spotType: ""
     property string intro: ""
@@ -30,7 +30,7 @@ Rectangle {
 
             Text {
                 anchors.centerIn: parent
-                text: root.spotId
+                text: root.spotNodeId
                 color: "white"
                 font.bold: true
             }

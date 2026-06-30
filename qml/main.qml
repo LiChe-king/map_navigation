@@ -156,7 +156,7 @@ ApplicationWindow {
 
         onSpotSelected: function(spot) {
             window.currentPopupSpot = spot
-            window.currentFocusSpotId = spot.id
+            window.currentFocusSpotId = spot.nodeId
             mapWorkspace.jumpToSpot(spot.x, spot.y)
         }
         onPathCalculated: function(result) {
@@ -184,8 +184,8 @@ ApplicationWindow {
     function getSpotIdByName(name) {
         var spots = campusBackend.spots
         for (var i = 0; i < spots.length; i++) {
-            if (spots[i].name === name || (spots[i].id + " " + spots[i].name) === name) {
-                return spots[i].id
+            if (spots[i].name === name || (spots[i].nodeId + " " + spots[i].name) === name) {
+                return spots[i].nodeId
             }
         }
 

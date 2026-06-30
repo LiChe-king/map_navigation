@@ -119,7 +119,7 @@ DraggablePopup {
                         onNavigateClicked: {
                             if (!root.backend || !root.getSpotIdByNameFn) return
                             var centerId = root.getSpotIdByNameFn(centerPicker.editText)
-                            var result = root.backend.findShortestPath(centerId, model.spot.id)
+                            var result = root.backend.findShortestPath(centerId, model.spot.nodeId)
                             root.pathSelected(centerPicker.editText, model.spot.name, result)
                             root.close()
                         }

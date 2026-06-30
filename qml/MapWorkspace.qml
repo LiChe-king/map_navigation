@@ -116,8 +116,7 @@ Item {
 
         if (node && node.isSpot === true && root.backend) {
             var spot = root.backend.spotDetailByNode(id)
-            if (spot && spot.id) {
-                node.spotId = spot.id
+            if (spot && spot.nodeId) {
                 node.nodeId = spot.nodeId
                 node.name = spot.name
                 node.type = spot.type
@@ -150,7 +149,7 @@ Item {
             var dist = Math.sqrt(dx * dx + dy * dy)
             if (dist < minDist) {
                 minDist = dist
-                nearestId = spots[i].id
+                nearestId = spots[i].nodeId
                 nearestName = spots[i].name
             }
         }

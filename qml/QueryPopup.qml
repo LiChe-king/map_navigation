@@ -66,7 +66,7 @@ DraggablePopup {
 
                 delegate: SpotListRow {
                     width: ListView.view.width
-                    spotId: modelData.id
+                    spotNodeId: modelData.nodeId
                     spotName: modelData.name
                     spotType: modelData.type
                     intro: modelData.intro || ""

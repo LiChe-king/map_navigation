@@ -21,14 +21,14 @@ public:
     
     // ========== 景点相关（QML可调用） ==========
     Q_INVOKABLE QVariantList spots() const;
-    Q_INVOKABLE QVariantMap spotDetail(int id) const;
+    Q_INVOKABLE QVariantMap spotDetail(int nodeId) const;
     Q_INVOKABLE QVariantMap spotDetailByNode(int nodeId) const;
     Q_INVOKABLE bool isSpotNode(int nodeId) const;
-    Q_INVOKABLE bool addSpot(int id, const QString& name, const QString& type, 
+    Q_INVOKABLE bool addSpot(int nodeId, const QString& name, const QString& type, 
                              const QString& intro, double x, double y);
-    Q_INVOKABLE bool updateSpot(int id, const QString& name, const QString& type,
+    Q_INVOKABLE bool updateSpot(int nodeId, const QString& name, const QString& type,
                                 const QString& intro, double x, double y);
-    Q_INVOKABLE bool removeSpot(int id);
+    Q_INVOKABLE bool removeSpot(int nodeId);
     
     // ========== 节点相关（路口，QML可调用） ==========
     Q_INVOKABLE QVariantList nodes() const;
@@ -48,11 +48,11 @@ public:
     Q_INVOKABLE QVariantMap config() const;
     
     // 只更新内存，不保存文件
-    Q_INVOKABLE bool updateSpotOnly(int id, const QString& name, const QString& type,
+    Q_INVOKABLE bool updateSpotOnly(int nodeId, const QString& name, const QString& type,
                                     const QString& intro, double x, double y);
-    Q_INVOKABLE bool addSpotOnly(int id, const QString& name, const QString& type,
+    Q_INVOKABLE bool addSpotOnly(int nodeId, const QString& name, const QString& type,
                                  const QString& intro, double x, double y);
-    Q_INVOKABLE bool removeSpotOnly(int id);
+    Q_INVOKABLE bool removeSpotOnly(int nodeId);
     Q_INVOKABLE bool updateNodeOnly(int id, double x, double y);
     Q_INVOKABLE bool addNodeOnly(int id, double x, double y);
     Q_INVOKABLE bool removeNodeOnly(int id);

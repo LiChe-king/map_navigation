@@ -136,7 +136,7 @@ PathResult PathFinder::buildPathFromNodeIndices(const std::vector<int>& indices,
 
         const Spot* spot = graph->getSpotByNodeId(node.id);
         if (spot) {
-            result.spotIds.push_back(spot->id);
+            result.spotNodeIds.push_back(spot->nodeId);
         }
     }
 
@@ -167,7 +167,7 @@ std::vector<NearbyResult> PathFinder::nearestByType(int fromId, const std::strin
         }
 
         NearbyResult item;
-        item.spotId = spot.id;
+        item.spotNodeId = spot.nodeId;
         item.distance = dist[targetIdx];
         item.path = buildPathToIndex(prev, targetIdx, dist[targetIdx]);
         results.push_back(item);

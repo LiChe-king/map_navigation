@@ -154,7 +154,7 @@ Item {
                 previewSpotY: root.previewNodeY
                 onSpotClicked: function(spot) {
                     root.popupSpot = spot
-                    root.focusSpotId = spot.id
+                    root.focusSpotId = spot.nodeId
                 }
             }
         }

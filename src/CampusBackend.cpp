@@ -66,9 +66,9 @@ QVariantList CampusBackend::spots() const
     return result;
 }
 
-QVariantMap CampusBackend::spotDetail(int id) const
+QVariantMap CampusBackend::spotDetail(int nodeId) const
 {
-    const Spot* spot = graph.getSpotById(id);
+    const Spot* spot = graph.getSpotByNodeId(nodeId);
     return spot ? spotToMap(*spot) : QVariantMap();
 }
 
@@ -83,14 +83,13 @@ bool CampusBackend::isSpotNode(int nodeId) const
     return graph.hasSpotNode(nodeId);
 }
 
-bool CampusBackend::addSpot(int id, const QString& name, const QString& type,
+bool CampusBackend::addSpot(int nodeId, const QString& name, const QString& type,
                             const QString& intro, double x, double y)
 {
-    if (id >= ROAD_NODE_START_ID) return false;
+    if (nodeId >= ROAD_NODE_START_ID) return false;
 
     Spot spot;
-    spot.id = id;
-    spot.nodeId = id;
+    spot.nodeId = nodeId;
     spot.name = name.toStdString();
     spot.type = type.toStdString();
     spot.intro = intro.toStdString();
@@ -110,14 +109,13 @@ bool CampusBackend::addSpot(int id, const QString& name, const QString& type,
     return ok;
 }
 
-bool CampusBackend::updateSpot(int id, const QString& name, const QString& type,
+bool CampusBackend::updateSpot(int nodeId, const QString& name, const QString& type,
                                const QString& intro, double x, double y)
 {
-    const Spot* existing = graph.getSpotById(id);
+    const Spot* existing = graph.getSpotByNodeId(nodeId);
     if (!existing) return false;
 
     Spot spot;
-    spot.id = id;
     spot.nodeId = existing->nodeId;
     spot.name = name.toStdString();
     spot.type = type.toStdString();
@@ -138,9 +136,9 @@ bool CampusBackend::updateSpot(int id, const QString& name, const QString& type,
     return ok;
 }
 
-bool CampusBackend::removeSpot(int id)
+bool CampusBackend::removeSpot(int nodeId)
 {
-    bool ok = graph.removeSpotAndNode(id);
+    bool ok = graph.removeSpotAndNode(nodeId);
     if (ok) {
         save();
         emit spotsChanged();
@@ -281,7 +279,7 @@ QVariantList CampusBackend::findNearby(int fromId, const QString& type, int limi
     
     for (const NearbyResult& item : finder.nearestByType(fromId, type.toStdString(), limit)) {
         QVariantMap row;
-        const Spot* spot = graph.getSpotById(item.spotId);
+        const Spot* spot = graph.getSpotByNodeId(item.spotNodeId);
         if (spot) {
             row["spot"] = spotToMap(*spot);
         }
@@ -315,7 +313,6 @@ QString CampusBackend::dataPath(const QString &fileName) const
 QVariantMap CampusBackend::spotToMap(const Spot& spot) const
 {
     QVariantMap item;
-    item["id"] = spot.id;
     item["nodeId"] = spot.nodeId;
     item["name"] = QString::fromStdString(spot.name);
     item["type"] = QString::fromStdString(spot.type);
@@ -368,14 +365,13 @@ QVariantMap CampusBackend::pathToMap(const PathResult& path) const
     return item;
 }
 
-bool CampusBackend::updateSpotOnly(int id, const QString& name, const QString& type,
+bool CampusBackend::updateSpotOnly(int nodeId, const QString& name, const QString& type,
                                     const QString& intro, double x, double y)
 {
-    const Spot* existing = graph.getSpotById(id);
+    const Spot* existing = graph.getSpotByNodeId(nodeId);
     if (!existing) return false;
 
     Spot spot;
-    spot.id = id;
     spot.nodeId = existing->nodeId;
     spot.name = name.toStdString();
     spot.type = type.toStdString();
@@ -395,14 +391,13 @@ bool CampusBackend::updateSpotOnly(int id, const QString& name, const QString& t
     return ok;
 }
 
-bool CampusBackend::addSpotOnly(int id, const QString& name, const QString& type,
+bool CampusBackend::addSpotOnly(int nodeId, const QString& name, const QString& type,
                                 const QString& intro, double x, double y)
 {
-    if (id >= ROAD_NODE_START_ID) return false;
+    if (nodeId >= ROAD_NODE_START_ID) return false;
 
     Spot spot;
-    spot.id = id;
-    spot.nodeId = id;
+    spot.nodeId = nodeId;
     spot.name = name.toStdString();
     spot.type = type.toStdString();
     spot.intro = intro.toStdString();
@@ -421,9 +416,9 @@ bool CampusBackend::addSpotOnly(int id, const QString& name, const QString& type
     return ok;
 }
 
-bool CampusBackend::removeSpotOnly(int id)
+bool CampusBackend::removeSpotOnly(int nodeId)
 {
-    bool ok = graph.removeSpotAndNode(id);
+    bool ok = graph.removeSpotAndNode(nodeId);
     if (ok) {
         emit spotsChanged();
         emit nodesChanged();
