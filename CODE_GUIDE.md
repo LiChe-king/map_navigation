@@ -1,6 +1,6 @@
 # CampusGuide 代码说明文档
 
-本文档用于说明广西大学校园导游系统的代码结构、数据流、核心数据结构和主要算法。阅读目标是快速理解：数据文件如何进入内存，校园路网如何被建模，路径查询如何运行，以及 QML 前端如何调用 C++ 后端。
+本文档说明 CampusGuide 校园导游咨询系统的代码结构、数据流、核心数据结构和主要算法。当前代码已经将景点身份统一绑定到 `nodeId`：`Spot` 不再拥有独立 `id`，`CampusGraph` 也只维护一张按 `nodeId` 查询景点的哈希表。
 
 ## 1. 项目整体结构
 
@@ -16,7 +16,7 @@ CampusGuide/
 |   |-- Edge.h               道路边结构
 |   |-- RoadNetwork.h/cpp    路网邻接表、节点和边操作
 |   |-- CampusGraph.h/cpp    校园图总管理、景点索引、文件读写
-|   |-- PathFinder.h/cpp     最短路径和附近设施查询
+|   |-- PathFinder.h/cpp     最短路径、可选路径和附近设施查询
 |   |-- MinHeap.h            Dijkstra 使用的手写最小堆
 |   |-- CampusBackend.h/cpp  暴露给 QML 的 QObject 后端
 |   |-- ParserUtils.h        文本解析辅助函数
@@ -41,7 +41,6 @@ CampusGuide/
 
 ```cpp
 struct Spot {
-    int id = -1;
     int nodeId = -1;
     std::string name;
     std::string type;
@@ -53,13 +52,12 @@ struct Spot {
 
 | 字段 | 含义 |
 | --- | --- |
-| `id` | 景点编号，用于查询和显示 |
-| `nodeId` | 景点绑定的路网节点 ID |
+| `nodeId` | 景点绑定的路网节点 ID，也是景点唯一标识 |
 | `name` | 景点名称 |
 | `type` | 景点类型，如校门、食堂、教学楼等 |
 | `intro` | 景点简介 |
 
-注意：`Spot` 不保存 `x/y` 坐标。景点位置统一由 `nodeId` 指向的 `Node` 保存，避免景点信息和路网节点各自保存坐标造成不同步。
+`Spot` 不保存独立景点 ID，也不保存 `x/y` 坐标。景点位置统一由 `nodeId` 指向的 `Node` 保存，避免景点信息和路网节点各自保存坐标造成不同步。
 
 ### 2.2 Node：路网节点
 
@@ -75,10 +73,10 @@ struct Node {
 
 `Node` 是路径算法真正使用的图顶点。节点分为两类：
 
-- 景点节点：被某个 `Spot.nodeId` 引用，项目约定 ID 小于 `1000`。
-- 普通路点：只用于描述道路转折、路口和连通关系，项目约定 ID 从 `1000` 开始。
+- 景点节点：被某个 `Spot.nodeId` 引用，项目约定新增时使用 `1-999`。
+- 普通路点：只用于描述道路转折、路口和连通关系，项目约定新增时使用 `1000` 及以上。
 
-编辑和新增逻辑使用 `1000` 作为景点与路点的编号分界：新增景点只使用 `1-999` 的空闲 ID，新增路点使用 `1000` 及以上 ID。运行时判断一个节点是否是景点节点，仍通过 `CampusGraph::hasSpotNode(nodeId)` 判断，这样可以避免仅靠编号范围误判历史数据或异常数据。
+运行时判断一个节点是否是景点节点，不依赖编号范围，而是通过 `CampusGraph::hasSpotNode(nodeId)` 判断。
 
 ### 2.3 Edge：邻接表中的边
 
@@ -114,32 +112,22 @@ CampusBackend::load()
        -> RoadNetwork::loadEdges()
 ```
 
-加载顺序很重要：
+加载顺序：
 
 1. 先读 `config.txt`，得到比例尺 `scale`、学校名和地图文件名。
 2. 再读 `nodes.txt`，建立全部路网节点和 `idToIndex` 映射。
-3. 再读 `spots.txt`，建立景点列表。当前格式中景点节点 ID 默认等于景点 ID，坐标从 `nodes.txt` 中读取。
-4. 重建景点索引 `spotIdToIndex` 和 `spotNodeToIndex`。
+3. 再读 `spots.txt`，建立景点列表。景点只保存 `nodeId`，坐标从 `nodes.txt` 中相同 ID 的节点读取。
+4. 重建景点索引 `spotNodeToIndex`。
 5. 最后读 `edges.txt`，此时所有节点已存在，才能正确建立道路边。
 
 `spots.txt` 当前格式为：
 
 ```csv
-# id,name,type,intro
+# nodeId,name,type,intro
 1,北西门,校门,校园西北侧出入口
 ```
 
-景点文件不再保存 `x/y` 坐标，所有坐标统一由 `nodes.txt` 管理。程序仍兼容两种历史格式：
-
-```csv
-# 带坐标的旧格式
-id,name,type,intro,x,y
-
-# 显式 nodeId 的旧格式
-id,nodeId,name,type,intro
-```
-
-读取 `id,name,type,intro,x,y` 时，代码会令 `spot.nodeId = spot.id`，并在路网中自动补充对应节点；读取 `id,nodeId,name,type,intro` 时会保留显式绑定关系。保存时统一写回当前格式 `id,name,type,intro`。
+当前代码只读取这一种格式，不再兼容历史格式。景点文件不保存独立景点 ID，也不保存 `x/y` 坐标；坐标统一由 `nodes.txt` 管理。
 
 ## 4. RoadNetwork：路网邻接表
 
@@ -154,7 +142,7 @@ std::unordered_map<int, int> idToIndex;
 double scale = 0.35;
 ```
 
-三者关系如下：
+三者关系：
 
 ```text
 nodes[i]          第 i 个路网节点
@@ -209,7 +197,6 @@ to   -> from
 
 ```cpp
 std::vector<Spot> spots;
-std::unordered_map<int, int> spotIdToIndex;
 std::unordered_map<int, int> spotNodeToIndex;
 RoadNetwork roadNetwork;
 std::string schoolName;
@@ -222,20 +209,17 @@ std::string mapImage;
 - 管理景点增删改查。
 - 把节点和道路操作代理给 `RoadNetwork`。
 
-### 5.1 两个景点索引
+### 5.1 景点索引
 
-`CampusGraph` 维护两张哈希表：
+`CampusGraph` 只维护一张景点哈希表：
 
 ```text
-spotIdToIndex[spotId]       景点 ID -> spots 数组下标
 spotNodeToIndex[nodeId]     景点绑定节点 ID -> spots 数组下标
 ```
 
-因此下面这些查询都可以快速完成：
+因此下面这些查询可以快速完成：
 
-- `getSpotById(id)`
 - `getSpotByNodeId(nodeId)`
-- `hasSpot(id)`
 - `hasSpotNode(nodeId)`
 
 每次景点增删改后都会调用 `rebuildSpotMaps()` 重建索引。
@@ -293,7 +277,7 @@ PathResult shortestPath(int fromId, int toId) const;
 ```cpp
 struct PathResult {
     std::vector<int> nodeIds;
-    std::vector<int> spotIds;
+    std::vector<int> spotNodeIds;
     std::vector<std::pair<double, double>> drawPoints;
     int totalLength = 0;
 };
@@ -304,11 +288,11 @@ struct PathResult {
 | 字段 | 含义 |
 | --- | --- |
 | `nodeIds` | 路径经过的所有路网节点 ID |
-| `spotIds` | 路径中属于景点的景点 ID |
+| `spotNodeIds` | 路径中属于景点的节点 ID |
 | `drawPoints` | 前端绘制路径线所需坐标 |
 | `totalLength` | 路径总长度 |
 
-`spotIds` 通过 `graph->getSpotByNodeId(node.id)` 判断，不通过节点编号范围判断。
+`spotNodeIds` 通过 `graph->getSpotByNodeId(node.id)` 判断，不通过节点编号范围判断。
 
 ### 6.2 所有可选简单路径
 
@@ -318,7 +302,7 @@ struct PathResult {
 std::vector<PathResult> allSimplePaths(int fromId, int toId, int maxCount = 3) const;
 ```
 
-该接口用于查询任意两个景点之间距离较短的可选简单路径。简单路径要求同一条路径中不重复经过同一个节点，因此不会出现绕圈路径。实现采用“基于最短路径偏离”的思路，而不是全图暴力枚举：
+该接口用于查询任意两个景点之间距离较短的可选简单路径。简单路径要求同一条路径中不重复经过同一个节点，因此不会出现绕圈路径。实现采用“基于最短路径偏离”的思路：
 
 1. 先用 Dijkstra 得到第 1 条最短路径。
 2. 以已找到的路径为基础，依次选择路径中的某个节点作为偏离点。
@@ -412,26 +396,26 @@ Q_PROPERTY(QVariantList edges READ edges NOTIFY edgesChanged)
 ```text
 load() / save()
 spots() / nodes() / edges()
-spotDetail(id)
+spotDetail(nodeId)
 spotDetailByNode(nodeId)
 isSpotNode(nodeId)
 findShortestPath(fromId, toId)
 findAllPaths(fromId, toId, limit)
 findNearby(fromId, type, limit)
-addSpot(...) / updateSpot(...) / removeSpot(...)
-addNode(...) / updateNode(...) / removeNode(...)
+addSpot(nodeId, ...) / updateSpot(nodeId, ...) / removeSpot(nodeId)
+addNode(id, ...) / updateNode(id, ...) / removeNode(id)
 addEdge(from, to) / removeEdge(from, to)
 ```
 
 数据转换示例：
 
 ```text
-Spot       -> { id, nodeId, name, type, intro, x, y }
+Spot       -> { nodeId, name, type, intro, x, y }
 Node       -> { id, x, y, isSpot }
 PathResult -> { ids, names, points, length }
 ```
 
-其中 `Spot` 转给 QML 时会临时补上 `x/y`，但真实坐标仍来自绑定的 `Node`。
+其中 `Spot` 转给 QML 时会临时补上 `x/y`，但真实坐标仍来自绑定的 `Node`。路径结果里的 `ids` 是完整路网节点 ID 列表，`names` 只包含路径经过的景点名称。
 
 ### 8.1 立即保存和仅改内存
 
@@ -442,16 +426,16 @@ add/update/remove...       修改内存后立即 save()
 add/update/remove...Only   只修改内存，不立即保存文件
 ```
 
-编辑界面可以用 `Only` 版本提高交互效率，等用户确认后再调用 `save()` 统一写入文件。
+编辑界面使用 `Only` 版本提高交互效率，等用户确认后再调用 `save()` 统一写入文件。
 
 ### 8.2 ID 分界保护
 
 `CampusBackend` 使用 `ROAD_NODE_START_ID = 1000` 保护新增接口：
 
-- `addSpot()` / `addSpotOnly()` 要求景点 ID 小于 `1000`。
+- `addSpot()` / `addSpotOnly()` 要求景点节点 ID 小于 `1000`。
 - `addNode()` / `addNodeOnly()` 要求普通路点 ID 大于等于 `1000`。
 
-这样可以和前端编辑逻辑保持一致，避免新增数据破坏“景点 `<1000`，路点 `>=1000`”的编号约定。
+这样可以和前端编辑逻辑保持一致，避免新增数据破坏“景点节点 `<1000`，普通路点 `>=1000`”的编号约定。
 
 ## 9. QML 前端组织
 
@@ -471,15 +455,16 @@ NearbyPopup.qml          附近搜索弹窗
 QueryPopup.qml           景点查询弹窗，支持类型筛选和关键词搜索
 EditorPanel.qml          编辑模式工具面板
 SpotEditForm.qml         景点编辑表单
+EditActions.qml          编辑动作封装
 ```
 
 QML 不直接维护复杂数据结构，而是通过 `campusBackend` 获取列表、提交编辑操作和发起路径查询。
 
-路径查询结果会把最短路径放在 `paths[0]`，其他可选路径放在后续位置。地图绘制时最短路径保持蓝色，其他可选路径统一使用橙色，并在与最短路径分叉后的独立路段上标注 `2`、`3` 等序号，以便同时对比多条路线。
+当前前端中部分属性名仍叫 `focusSpotId`、`getSpotIdByNameFn`，但它们传递的值已经是景点的 `nodeId`。景点对象本身从后端拿到的是 `{ nodeId, name, type, intro, x, y }`，不再包含独立 `id` 字段。
 
-`QueryPopup.qml` 会从 `spotsModel` 中提取全部景点类型，生成“全部类型 + 类型列表”的下拉框；搜索框会在景点名称、类型和简介中做关键词匹配。筛选结果保存到 `filteredSpotsModel`，列表只渲染筛选后的景点。
+`QueryPopup.qml` 从 `spotsModel` 中提取全部景点类型，生成“全部类型 + 类型列表”的下拉框；搜索框会在景点名称、类型和简介中做关键词匹配。筛选结果保存到 `filteredSpotsModel`，列表只渲染筛选后的景点。
 
-`EditActions.qml` 中的新增逻辑也遵守 ID 分界：`nextSpotId()` 在 `1-999` 中寻找空闲 ID，`nextRoadNodeId()` 从现有路点最大 ID 继续递增并保证不小于 `1000`。
+`EditActions.qml` 中的新增逻辑遵守 ID 分界：`nextSpotNodeId()` 在 `1-999` 中寻找空闲节点 ID，`nextRoadNodeId()` 从现有路点最大 ID 继续递增并保证不小于 `1000`。
 
 ## 10. 数据结构课程设计对应点
 
@@ -488,14 +473,15 @@ QML 不直接维护复杂数据结构，而是通过 `campusBackend` 获取列�
 | 顺序表 | `std::vector<Spot>`、`std::vector<Node>` | 存储景点和路网节点 |
 | 图 | `RoadNetwork` | 校园道路抽象为无向带权图 |
 | 邻接表 | `std::vector<std::vector<Edge>> adj` | 存储稀疏路网 |
-| 哈希映射 | `idToIndex`、`spotIdToIndex`、`spotNodeToIndex` | 支持快速索引 |
+| 哈希映射 | `idToIndex`、`spotNodeToIndex` | 支持快速索引 |
 | 堆 | `MinHeap` | Dijkstra 中取最小距离节点 |
 | 最短路径 | `PathFinder::shortestPath` | Dijkstra 算法 |
+| 多路径查询 | `PathFinder::allSimplePaths` | 基于最短路径偏离生成候选路径 |
 | 单源多目标查询 | `PathFinder::nearestByType` | 一次 Dijkstra 后筛选附近设施 |
 | 排序 | `sortNearbyByDistance` | 插入排序 |
 | 文件持久化 | `loadFromFiles()`、`saveToFiles()` | 文本文件读写 |
 
-可以这样概括项目主线：
+项目主线可以概括为：
 
 ```text
 校园地图 -> 路网节点和道路边 -> 邻接表无向带权图
@@ -515,6 +501,6 @@ QML 不直接维护复杂数据结构，而是通过 `campusBackend` 获取列�
 5. `src/MinHeap.h`
 6. `src/PathFinder.h/cpp`
 7. `src/CampusBackend.h/cpp`
-8. `qml/MapPage.qml`、`qml/NavigationPopups.qml`、`qml/EditorPanel.qml`
+8. `qml/MapPage.qml`、`qml/NavigationPopups.qml`、`qml/EditorPanel.qml`、`qml/EditActions.qml`
 
 这样可以先抓住数据结构和算法主线，再理解界面如何调用后端。
