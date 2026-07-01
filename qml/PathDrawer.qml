@@ -4,37 +4,48 @@ Canvas {
     id: root
     property var pathPoints: []
     property var pathResults: []
+    property var pathColors: ["#3498db", "#e67e22", "#27ae60", "#8e44ad"]
+    property var visibleIndices: []
     property bool animated: false
     property real animationProgress: 1
     property real lineWidth: 15
     property real borderWidth: 2
-    property real vMarkSpacing: 200      // V 形标记间隔（像素）
-    property real vMarkSize: 8         // V 形大小
+    property real vMarkSpacing: 200
+    property real vMarkSize: 8
     property real smoothAngleThreshold: 100
 
     antialiasing: true
 
-    onPathPointsChanged: {
-        requestPaint()
-    }
-    onPathResultsChanged: {
-        requestPaint()
-    }
+    onPathPointsChanged: requestPaint()
+    onPathResultsChanged: requestPaint()
+    onVisibleIndicesChanged: requestPaint()
 
     onPaint: {
         var ctx = getContext("2d")
         ctx.clearRect(0, 0, width, height)
 
+        // 多条路径
         if (pathResults && pathResults.length > 0) {
-            var basePoints = pathResults[0].points || []
-            for (var i = pathResults.length - 1; i >= 1; i--) {
-                drawPath(ctx, pathResults[i].points || [], "#7a4a00", "#f39c12", 10, false, i + 1, basePoints)
+            // 先绘制非最短路径（底层）
+            for (var i = 0; i < pathResults.length; i++) {
+                var path = pathResults[i]
+                var points = path.points || []
+                if (points.length < 2) continue
+
+                var color = path.color || pathColors[i % pathColors.length]
+                var isShortest = (i === 0)
+                var pathWidth = isShortest ? lineWidth : lineWidth * 0.6
+                // 所有路径都显示箭头
+                var showMarks = true
+                drawPath(ctx, points, color, color, pathWidth, showMarks, "", [])
             }
-            drawPath(ctx, basePoints, "#1a3a5c", "#3498db", lineWidth, true, "", [])
             return
         }
 
-        drawPath(ctx, pathPoints || [], "#1a3a5c", "#3498db", lineWidth, true, "", [])
+        // 单条路径（兼容旧版）
+        if (pathPoints && pathPoints.length >= 2) {
+            drawPath(ctx, pathPoints, "#1a3a5c", "#3498db", lineWidth, true, "", [])
+        }
     }
 
     function drawPath(ctx, points, borderColor, pathColor, widthValue, showMarks, labelText, basePoints) {
@@ -74,7 +85,6 @@ Canvas {
         }
     }
 
-    // 沿路径绘制 V 形标记
     function drawVShapesAlongPath(ctx, points) {
         if (points.length < 2) return
 
@@ -97,7 +107,6 @@ Canvas {
 
         if (totalLength < vMarkSpacing) return
 
-        // 每隔 vMarkSpacing 距离放置一个 V 形
         var distance = vMarkSpacing
         while (distance < totalLength) {
             var pos = findPositionAtDistance(segments, distance)
@@ -206,20 +215,15 @@ Canvas {
         return best
     }
 
-    // 绘制 V 形（沿着前进方向开口向前）
     function drawVShape(ctx, point, angle) {
         var size = vMarkSize
         var x = point.x
         var y = point.y
 
-        // 计算旋转后的 V 形顶点
-        // 左臂终点
         var leftTipX = x + size * Math.cos(angle - Math.PI * 0.25)
         var leftTipY = y + size * Math.sin(angle - Math.PI * 0.25)
-        // 右臂终点
         var rightTipX = x + size * Math.cos(angle + Math.PI * 0.25)
         var rightTipY = y + size * Math.sin(angle + Math.PI * 0.25)
-        // V 的尖端（最前方）
         var frontX = x + size * 1.2 * Math.cos(angle)
         var frontY = y + size * 1.2 * Math.sin(angle)
 
@@ -234,7 +238,6 @@ Canvas {
         ctx.restore()
     }
 
-    // 以下保持自适应平滑函数不变
     function generateAdaptiveSmoothPoints(origPoints, segmentsBetween = 6) {
         if (origPoints.length < 2) return origPoints.slice()
         if (origPoints.length === 2) return origPoints.slice()

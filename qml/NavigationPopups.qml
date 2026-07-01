@@ -61,7 +61,7 @@ Item {
             root.mapPickRequested(mode, "nearby")
         }
         onPathCalculated: function(result) {
-            root.pathCalculated(result)
+            window.currentPathResult = result
         }
         onPathSelected: function(startName, endName, result) {
             nearbyPopup.close()

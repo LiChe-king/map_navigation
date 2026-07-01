@@ -87,6 +87,8 @@ Item {
                 anchors.fill: parent
                 pathPoints: root.pathResult.points || []
                 pathResults: root.pathResult.paths || []
+                visibleIndices: root.pathResult.visibleIndices || []
+                pathColors: root.pathResult.pathColors || ["#3498db", "#e67e22", "#27ae60", "#8e44ad"]
             }
 
             MouseArea {

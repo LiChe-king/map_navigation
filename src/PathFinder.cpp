@@ -2,8 +2,10 @@
 #include "MinHeap.h"
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <queue>
+#include <string>
 
 namespace {
 constexpr int INF_DISTANCE = std::numeric_limits<int>::max() / 4;
@@ -36,6 +38,47 @@ bool hasPath(const std::vector<PathResult>& paths, const std::vector<int>& ids)
     return std::any_of(paths.begin(), paths.end(), [&ids](const PathResult& path) {
         return samePath(path, ids);
     });
+}
+
+std::vector<std::pair<int, int>> pathEdges(const PathResult& path)
+{
+    std::vector<std::pair<int, int>> edges;
+    if (path.nodeIds.size() < 2) return edges;
+
+    edges.reserve(path.nodeIds.size() - 1);
+    for (int i = 1; i < static_cast<int>(path.nodeIds.size()); ++i) {
+        int a = path.nodeIds[i - 1];
+        int b = path.nodeIds[i];
+        if (a > b) std::swap(a, b);
+        edges.push_back({a, b});
+    }
+    return edges;
+}
+
+double overlapRatio(const PathResult& a, const PathResult& b)
+{
+    const std::vector<std::pair<int, int>> edgesA = pathEdges(a);
+    const std::vector<std::pair<int, int>> edgesB = pathEdges(b);
+    if (edgesA.empty() || edgesB.empty()) return 0.0;
+
+    int shared = 0;
+    for (const auto& edge : edgesA) {
+        if (std::find(edgesB.begin(), edgesB.end(), edge) != edgesB.end()) {
+            ++shared;
+        }
+    }
+
+    const int base = std::max(edgesA.size(), edgesB.size());
+    return base > 0 ? static_cast<double>(shared) / static_cast<double>(base) : 0.0;
+}
+
+double maxOverlapWithPaths(const std::vector<PathResult>& paths, const PathResult& candidate)
+{
+    double best = 0.0;
+    for (const PathResult& path : paths) {
+        best = std::max(best, overlapRatio(path, candidate));
+    }
+    return best;
 }
 
 bool hasEdgeBan(const std::vector<std::pair<int, int>>& bannedEdges, int fromId, int toId)
@@ -320,15 +363,34 @@ std::vector<PathResult> PathFinder::allSimplePaths(int fromId, int toId, int max
                 auto itIdx = idToIdx.find(nodeId);
                 if (itIdx != idToIdx.end()) totalIndices.push_back(itIdx->second);
             }
-            candidates.push_back(buildPathFromNodeIndices(totalIndices, rootLength + spurResult.second));
+
+            PathResult candidate = buildPathFromNodeIndices(totalIndices, rootLength + spurResult.second);
+            if (hasPath(results, candidate.nodeIds)
+                || hasPath(candidates, candidate.nodeIds)
+                || maxOverlapWithPaths(results, candidate) >= 0.99
+                || maxOverlapWithPaths(candidates, candidate) >= 0.99) {
+                continue;
+            }
+
+            candidates.push_back(candidate);
         }
 
         if (candidates.empty()) break;
-        std::sort(candidates.begin(), candidates.end(), [](const PathResult& a, const PathResult& b) {
+        std::sort(candidates.begin(), candidates.end(), [&results](const PathResult& a, const PathResult& b) {
+            double aOverlap = maxOverlapWithPaths(results, a);
+            double bOverlap = maxOverlapWithPaths(results, b);
+            if (aOverlap != bOverlap) return aOverlap < bOverlap;
             return a.totalLength < b.totalLength;
         });
         results.push_back(candidates.front());
         candidates.erase(candidates.begin());
+    }
+
+    if (results.size() > 1) {
+        std::stable_sort(results.begin() + 1, results.end(), [](const PathResult& a, const PathResult& b) {
+            if (a.totalLength != b.totalLength) return a.totalLength < b.totalLength;
+            return a.nodeIds.size() < b.nodeIds.size();
+        });
     }
 
     return results;
