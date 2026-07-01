@@ -367,8 +367,8 @@ std::vector<PathResult> PathFinder::allSimplePaths(int fromId, int toId, int max
             PathResult candidate = buildPathFromNodeIndices(totalIndices, rootLength + spurResult.second);
             if (hasPath(results, candidate.nodeIds)
                 || hasPath(candidates, candidate.nodeIds)
-                || maxOverlapWithPaths(results, candidate) >= 0.99
-                || maxOverlapWithPaths(candidates, candidate) >= 0.99) {
+                || maxOverlapWithPaths(results, candidate) >= 0.95
+                || maxOverlapWithPaths(candidates, candidate) >= 0.95) {
                 continue;
             }
 
@@ -377,10 +377,11 @@ std::vector<PathResult> PathFinder::allSimplePaths(int fromId, int toId, int max
 
         if (candidates.empty()) break;
         std::sort(candidates.begin(), candidates.end(), [&results](const PathResult& a, const PathResult& b) {
+            if (a.totalLength != b.totalLength) return a.totalLength < b.totalLength;
             double aOverlap = maxOverlapWithPaths(results, a);
             double bOverlap = maxOverlapWithPaths(results, b);
             if (aOverlap != bOverlap) return aOverlap < bOverlap;
-            return a.totalLength < b.totalLength;
+            return a.nodeIds.size() < b.nodeIds.size();
         });
         results.push_back(candidates.front());
         candidates.erase(candidates.begin());

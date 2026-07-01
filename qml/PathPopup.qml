@@ -159,7 +159,7 @@ DraggablePopup {
                 var idx = btn.buttonIndex
                 var isVisible = visiblePathIndices.indexOf(idx) >= 0
                 btn.text = "路径" + idx + " " + (isVisible ? "✕" : "✓")
-                btn.background.color = isVisible ? "#e74c3c" : root.pathColors[(idx-1) % root.pathColors.length]
+                btn.background.color = isVisible ? "#e74c3c" : root.pathColors[idx % root.pathColors.length]
             }
         }
     }
@@ -333,7 +333,7 @@ DraggablePopup {
 
                         Button {
                             property int buttonIndex: index + 1
-                            property color buttonColor: root.pathColors[index % root.pathColors.length]
+                            property color buttonColor: root.pathColors[buttonIndex % root.pathColors.length]
 
                             text: "路径" + (index + 1) + " ✓"
                             implicitHeight: 28
